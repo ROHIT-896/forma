@@ -2,9 +2,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
   Database, Info, Cpu, HardDrive, ShieldCheck, Download, Upload,
   Bell, Palette, RefreshCw, Trash2, CheckCircle2, Clock, AlertCircle,
+  Moon, Sun, Sparkles, RotateCcw, Sliders,
 } from 'lucide-react';
 import type { AppInfo, DBPingResult } from '../../shared/types';
-import { useAppStore } from '../store/appStore';
+import { useAppStore, type ThemeMode } from '../store/appStore';
 
 const ACCENT_COLORS = [
   { id: 'emerald', label: 'Emerald', bg: 'bg-emerald-500', hex: '#10b981' },
@@ -46,7 +47,13 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export default function SettingsScreen() {
-  const { setAccentColor: storeSetAccentColor } = useAppStore();
+  const {
+    setAccentColor: storeSetAccentColor,
+    themeMode,
+    setThemeMode,
+    resetOnboarding,
+    setOnboardingOpen,
+  } = useAppStore();
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [ping, setPing] = useState<DBPingResult | null>(null);
   const [backups, setBackups] = useState<Array<{ fileName: string; sizeBytes: number; createdAt: string }>>([]);
@@ -164,28 +171,68 @@ export default function SettingsScreen() {
         <>
           {/* Appearance & Accent Color */}
           <Section title="Appearance">
-            <div className="py-2 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-300 flex items-center gap-2">
-                  <Palette className="w-4 h-4 text-slate-500" /> Accent Color
-                </span>
-                <span className="text-xs text-slate-500 font-mono capitalize">{accentColor}</span>
+            <div className="py-2 space-y-4">
+              {/* Theme Mode */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-300 flex items-center gap-2">
+                    <Moon className="w-4 h-4 text-slate-500" /> Theme Mode
+                  </span>
+                  <span className="text-xs text-slate-500 font-mono capitalize">{themeMode} Mode</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 pt-1">
+                  {[
+                    { id: 'dark' as ThemeMode, label: 'Dark', icon: <Moon className="w-3.5 h-3.5" />, desc: 'Charcoal & Slate' },
+                    { id: 'light' as ThemeMode, label: 'Light', icon: <Sun className="w-3.5 h-3.5" />, desc: 'Crisp Day' },
+                    { id: 'midnight' as ThemeMode, label: 'Midnight', icon: <Sparkles className="w-3.5 h-3.5" />, desc: 'Pure OLED Black' },
+                  ].map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={async () => {
+                        await setThemeMode(t.id);
+                        setSaveStatus(`${t.label} theme activated`);
+                        setTimeout(() => setSaveStatus(null), 2500);
+                      }}
+                      className={`flex flex-col items-center justify-center py-2.5 px-3 rounded-lg border text-xs font-medium cursor-pointer transition ${
+                        themeMode === t.id
+                          ? 'border-[var(--accent-primary)] text-white bg-slate-800/80 shadow-sm'
+                          : 'border-[#272B36] text-slate-400 hover:border-slate-600 bg-[#14171E]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-semibold">
+                        {t.icon}
+                        <span>{t.label}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 mt-0.5">{t.desc}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="flex items-center gap-3 pt-1">
-                {ACCENT_COLORS.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => handleAccentChange(c.id)}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium cursor-pointer transition ${
-                      accentColor === c.id
-                        ? 'border-white text-white bg-slate-800'
-                        : 'border-[#272B36] text-slate-400 hover:border-slate-600'
-                    }`}
-                  >
-                    <span className={`w-3 h-3 rounded-full ${c.bg}`} />
-                    {c.label}
-                  </button>
-                ))}
+
+              {/* Accent Color */}
+              <div className="pt-2 border-t border-[#1F222B] space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-300 flex items-center gap-2">
+                    <Palette className="w-4 h-4 text-slate-500" /> Accent Color
+                  </span>
+                  <span className="text-xs text-slate-500 font-mono capitalize">{accentColor}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                  {ACCENT_COLORS.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => handleAccentChange(c.id)}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium cursor-pointer transition ${
+                        accentColor === c.id
+                          ? 'border-white text-white bg-slate-800'
+                          : 'border-[#272B36] text-slate-400 hover:border-slate-600'
+                      }`}
+                    >
+                      <span className={`w-3 h-3 rounded-full ${c.bg}`} />
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </Section>
@@ -329,19 +376,32 @@ export default function SettingsScreen() {
             <Row label="Electron Version" value={appInfo?.electron_version ?? '—'} icon={<Cpu />} mono />
           </Section>
 
-          {/* Reset Action */}
-          <div className="pt-2">
-            <button
-              onClick={() => {
-                if (window.confirm('Reset onboarding? Your workout and diet logs will be kept, but the setup wizard will open again.')) {
-                  window.formaAPI?.setOnboardingSkipped(false).then(() => window.location.reload());
-                }
-              }}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-red-950/30 hover:bg-red-900/40 text-red-400 text-xs font-semibold transition border border-red-900/40 cursor-pointer"
-            >
-              <Trash2 className="w-4 h-4" /> Reset Onboarding Profile
-            </button>
-          </div>
+          {/* Onboarding & Profile Wizard */}
+          <Section title="Profile & Setup">
+            <div className="py-2 space-y-3">
+              <p className="text-xs text-slate-400">
+                You can re-run the interactive onboarding wizard anytime to adjust your biometric targets, training split, or dietary parameters.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setOnboardingOpen(true)}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[var(--accent-primary)] hover:opacity-90 text-white text-xs font-semibold transition cursor-pointer shadow-sm"
+                >
+                  <Sliders className="w-4 h-4" /> Open Setup Wizard
+                </button>
+                <button
+                  onClick={async () => {
+                    if (window.confirm('Reset onboarding profile? Your workout and diet logs will be kept, but your profile and plan parameters will be cleared so you can start the wizard fresh.')) {
+                      await resetOnboarding();
+                    }
+                  }}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-red-950/30 hover:bg-red-900/40 text-red-400 text-xs font-semibold transition border border-red-900/40 cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" /> Reset Profile
+                </button>
+              </div>
+            </div>
+          </Section>
 
           <div className="text-center pt-2 pb-8">
             <p className="text-xs text-slate-600">FORMA · Version 0.1.0 · Apple Silicon Native</p>

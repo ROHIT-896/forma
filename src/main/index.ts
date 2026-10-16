@@ -146,6 +146,7 @@ function setupIPCHandlers(dbInfo: { dbPath: string; backupCount: number; schemaV
 
   // Profile & Plan
   ipcMain.handle('plan:getProfile', async () => planRepo.getProfile(getDatabase()));
+  ipcMain.handle('plan:clearProfile', async () => planRepo.deleteProfile(getDatabase()));
   ipcMain.handle('plan:saveProfile', async (_e, profile) => planRepo.saveProfile(getDatabase(), profile));
   ipcMain.handle('plan:getPlan', async () => planRepo.getPlan(getDatabase()));
   ipcMain.handle('plan:previewUpdate', async () => planRepo.previewPlanUpdate(getDatabase()));
@@ -162,6 +163,10 @@ function setupIPCHandlers(dbInfo: { dbPath: string; backupCount: number; schemaV
   ipcMain.handle('workout:logSet', async (_e, set) => workoutRepo.logWorkoutSet(getDatabase(), set));
   ipcMain.handle('workout:undoSet', async (_e, workoutId) => workoutRepo.undoLastWorkoutSet(getDatabase(), workoutId));
   ipcMain.handle('workout:cancel', async (_e, workoutId) => workoutRepo.cancelWorkout(getDatabase(), workoutId));
+  ipcMain.handle('workout:update', async (_e, workoutId, updates) => workoutRepo.updateWorkout(getDatabase(), workoutId, updates));
+  ipcMain.handle('workout:delete', async (_e, workoutId) => workoutRepo.deleteWorkout(getDatabase(), workoutId));
+  ipcMain.handle('workout:deleteSet', async (_e, setId) => workoutRepo.deleteWorkoutSet(getDatabase(), setId));
+  ipcMain.handle('workout:updateSet', async (_e, setId, updates) => workoutRepo.updateWorkoutSet(getDatabase(), setId, updates));
   ipcMain.handle('workout:getSets', async (_e, workoutId) => workoutRepo.getWorkoutSets(getDatabase(), workoutId));
   ipcMain.handle('workout:finish', async (_e, summary) => workoutRepo.finishWorkout(getDatabase(), summary));
   ipcMain.handle('workout:getActive', async () => workoutRepo.getActiveWorkout(getDatabase()));

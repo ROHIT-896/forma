@@ -287,3 +287,73 @@ export function getRecentWorkouts(db: Database.Database, limit = 15): WorkoutRow
     .prepare('SELECT * FROM workouts ORDER BY date DESC, started_at DESC LIMIT ?')
     .all(limit) as WorkoutRow[];
 }
+
+export function recalculateWorkoutStats(db: Database.Database, workoutId: string): void {
+  const sets = db.prepare('SELECT weight_kg, reps FROM workout_sets WHERE workout_id = ?').all(workoutId) as Array<{ weight_kg: number; reps: number }>;
+  const totalVolume = sets.reduce((sum, s) => sum + (s.weight_kg * s.reps), 0);
+  const totalSets = sets.length;
+  db.prepare('UPDATE workouts SET total_volume = ?, total_sets = ? WHERE id = ?').run(totalVolume, totalSets, workoutId);
+}
+
+export function updateWorkout(
+  db: Database.Database,
+  workoutId: string,
+  updates: { date?: string; focus?: string; planned_time_min?: number }
+): WorkoutRow {
+  const fields: string[] = [];
+  const params: any[] = [];
+  if (updates.date !== undefined) {
+    fields.push('date = ?');
+    params.push(updates.date);
+  }
+  if (updates.focus !== undefined) {
+    fields.push('focus = ?');
+    params.push(updates.focus);
+  }
+  if (updates.planned_time_min !== undefined) {
+    fields.push('planned_time_min = ?');
+    params.push(updates.planned_time_min);
+  }
+  if (fields.length > 0) {
+    params.push(workoutId);
+    db.prepare(`UPDATE workouts SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+  }
+  return db.prepare('SELECT * FROM workouts WHERE id = ?').get(workoutId) as WorkoutRow;
+}
+
+export function deleteWorkout(db: Database.Database, workoutId: string): void {
+  cancelWorkout(db, workoutId);
+}
+
+export function deleteWorkoutSet(db: Database.Database, setId: string): void {
+  const setRow = db.prepare('SELECT workout_id FROM workout_sets WHERE id = ?').get(setId) as { workout_id: string } | undefined;
+  if (!setRow) return;
+  db.prepare('DELETE FROM workout_sets WHERE id = ?').run(setId);
+  recalculateWorkoutStats(db, setRow.workout_id);
+}
+
+export function updateWorkoutSet(
+  db: Database.Database,
+  setId: string,
+  updates: { weight_kg?: number; reps?: number }
+): LoggedSet {
+  const fields: string[] = [];
+  const params: any[] = [];
+  if (updates.weight_kg !== undefined) {
+    fields.push('weight_kg = ?');
+    params.push(updates.weight_kg);
+  }
+  if (updates.reps !== undefined) {
+    fields.push('reps = ?');
+    params.push(updates.reps);
+  }
+  if (fields.length > 0) {
+    params.push(setId);
+    db.prepare(`UPDATE workout_sets SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+  }
+  const updatedSet = db.prepare('SELECT * FROM workout_sets WHERE id = ?').get(setId) as LoggedSet;
+  if (updatedSet) {
+    recalculateWorkoutStats(db, updatedSet.workout_id);
+  }
+  return updatedSet;
+}

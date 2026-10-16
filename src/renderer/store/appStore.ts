@@ -8,6 +8,7 @@ import type { ProfileWithMeta } from '../../main/planRepo';
 import type { DayDietSummary, SavedMeal } from '../../main/dietRepo';
 
 export type NavTab = 'today' | 'workout' | 'food' | 'plan' | 'progress' | 'settings';
+export type ThemeMode = 'dark' | 'light' | 'midnight';
 
 export const ACCENT_PALETTE: Record<string, { label: string; primary: string; hover: string; bg: string; border: string }> = {
   emerald: {
@@ -47,7 +48,7 @@ export const ACCENT_PALETTE: Record<string, { label: string; primary: string; ho
   },
 };
 
-export function applyAccentTheme(colorId: string) {
+export function applyTheme(themeMode: ThemeMode, colorId: string) {
   const p = ACCENT_PALETTE[colorId] || ACCENT_PALETTE.emerald;
   const root = document.documentElement;
   root.style.setProperty('--accent-primary', p.primary);
@@ -55,6 +56,11 @@ export function applyAccentTheme(colorId: string) {
   root.style.setProperty('--accent-bg', p.bg);
   root.style.setProperty('--accent-border', p.border);
   root.setAttribute('data-accent', colorId);
+  root.setAttribute('data-theme', themeMode);
+}
+
+export function applyAccentTheme(colorId: string) {
+  applyTheme('dark', colorId);
 }
 
 interface AppState {
@@ -67,6 +73,7 @@ interface AppState {
   messMode: boolean;
   onboardingOpen: boolean;
   accentColor: string;
+  themeMode: ThemeMode;
 
   todayDiet: DayDietSummary | null;
   selectedDate: string; // YYYY-MM-DD
@@ -77,6 +84,8 @@ interface AppState {
   // Actions
   initApp: () => Promise<void>;
   setAccentColor: (color: string) => Promise<void>;
+  setThemeMode: (mode: ThemeMode) => Promise<void>;
+  resetOnboarding: () => Promise<void>;
   setSelectedDate: (date: string) => Promise<void>;
   toggleMessMode: () => Promise<void>;
   saveUserProfile: (profile: UserProfileInput) => Promise<void>;
@@ -99,6 +108,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   messMode: true,
   onboardingOpen: false,
   accentColor: 'emerald',
+  themeMode: 'dark',
 
   todayDiet: null,
   selectedDate: new Date().toISOString().slice(0, 10),
@@ -119,7 +129,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       ]);
 
       const savedAccent = settings?.accentColor || 'emerald';
-      applyAccentTheme(savedAccent);
+      const savedTheme = (settings?.themeMode as ThemeMode) || 'dark';
+      applyTheme(savedTheme, savedAccent);
 
       const today = new Date().toISOString().slice(0, 10);
       const diet = await window.formaAPI.getDayDiet(today);
@@ -130,6 +141,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         plan,
         messMode,
         accentColor: savedAccent,
+        themeMode: savedTheme,
         todayDiet: diet,
         savedMeals: saved,
         onboardingOpen: !profile && !skipped,
@@ -139,6 +151,29 @@ export const useAppStore = create<AppState>((set, get) => ({
       console.error('Failed to initialize app state:', err);
       set({ isLoading: false });
     }
+  },
+
+  setAccentColor: async (color) => {
+    set({ accentColor: color });
+    applyTheme(get().themeMode, color);
+    if (window.formaAPI) {
+      await window.formaAPI.saveSettings({ accentColor: color });
+    }
+  },
+
+  setThemeMode: async (mode) => {
+    set({ themeMode: mode });
+    applyTheme(mode, get().accentColor);
+    if (window.formaAPI) {
+      await window.formaAPI.saveSettings({ themeMode: mode });
+    }
+  },
+
+  resetOnboarding: async () => {
+    if (window.formaAPI) {
+      await window.formaAPI.clearProfile();
+    }
+    set({ profile: null, onboardingOpen: true });
   },
 
   setSelectedDate: async (date) => {
@@ -173,14 +208,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setOnboardingOpen: (open) => set({ onboardingOpen: open }),
-
-  setAccentColor: async (color) => {
-    set({ accentColor: color });
-    applyAccentTheme(color);
-    if (window.formaAPI) {
-      await window.formaAPI.saveSettings({ accentColor: color });
-    }
-  },
 
   skipOnboarding: async () => {
     set({ onboardingOpen: false });

@@ -50,6 +50,7 @@ export interface FormaAPI {
 
   // Profile & Plan
   getProfile: () => Promise<ProfileWithMeta | null>;
+  clearProfile: () => Promise<void>;
   saveProfile: (profile: UserProfileInput) => Promise<{ profile: ProfileWithMeta; planOutdated: boolean }>;
   getPlan: () => Promise<YourPlan | null>;
   previewPlanUpdate: () => Promise<{
@@ -87,6 +88,10 @@ export interface FormaAPI {
   }) => Promise<LoggedSet>;
   undoLastWorkoutSet: (workoutId: string) => Promise<LoggedSet | null>;
   cancelWorkout: (workoutId: string) => Promise<void>;
+  updateWorkout: (workoutId: string, updates: { date?: string; focus?: string; planned_time_min?: number }) => Promise<WorkoutRow>;
+  deleteWorkout: (workoutId: string) => Promise<void>;
+  deleteWorkoutSet: (setId: string) => Promise<void>;
+  updateWorkoutSet: (setId: string, updates: { weight_kg?: number; reps?: number }) => Promise<LoggedSet>;
   getWorkoutSets: (workoutId: string) => Promise<LoggedSet[]>;
   finishWorkout: (summary: WorkoutSummary) => Promise<void>;
   getActiveWorkout: () => Promise<{ workout: WorkoutRow; sets: LoggedSet[] } | null>;
@@ -150,6 +155,7 @@ export interface FormaAPI {
   getBackupsList: () => Promise<Array<{ fileName: string; sizeBytes: number; createdAt: string }>>;
   getSettings: () => Promise<{
     accentColor: string;
+    themeMode: 'dark' | 'light' | 'midnight';
     notifications: {
       workoutReminder: boolean;
       workoutTime: string;
@@ -159,6 +165,7 @@ export interface FormaAPI {
   }>;
   saveSettings: (settings: {
     accentColor?: string;
+    themeMode?: 'dark' | 'light' | 'midnight';
     notifications?: {
       workoutReminder: boolean;
       workoutTime: string;

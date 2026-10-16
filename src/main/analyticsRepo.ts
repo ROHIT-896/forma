@@ -198,6 +198,7 @@ export function getAppSettings(db: Database.Database) {
 
   return {
     accentColor: getMeta('accent_color', 'emerald'),
+    themeMode: (getMeta('theme_mode', 'dark') as 'dark' | 'light' | 'midnight'),
     notifications: {
       workoutReminder: getMeta('notif_workout_enabled', 'false') === 'true',
       workoutTime: getMeta('notif_workout_time', '18:00'),
@@ -211,6 +212,7 @@ export function saveAppSettings(
   db: Database.Database,
   settings: {
     accentColor?: string;
+    themeMode?: 'dark' | 'light' | 'midnight';
     notifications?: {
       workoutReminder: boolean;
       workoutTime: string;
@@ -223,6 +225,9 @@ export function saveAppSettings(
 
   if (settings.accentColor !== undefined) {
     setMeta.run('accent_color', settings.accentColor);
+  }
+  if (settings.themeMode !== undefined) {
+    setMeta.run('theme_mode', settings.themeMode);
   }
   if (settings.notifications !== undefined) {
     setMeta.run('notif_workout_enabled', String(settings.notifications.workoutReminder));

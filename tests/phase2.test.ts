@@ -12,6 +12,10 @@ import {
   finishWorkout,
   getExerciseHistory,
   listExercises,
+  updateWorkout,
+  deleteWorkout,
+  deleteWorkoutSet,
+  updateWorkoutSet,
 } from '../src/main/workoutRepo';
 import {
   generateWorkoutSession,
@@ -458,6 +462,67 @@ describe('Phase 2: Workout Generator, Active Session & Progression Tracking', ()
     expect(recent.length).toBeGreaterThanOrEqual(2);
     expect(recent.some((w) => w.focus === 'Push')).toBe(true);
     expect(recent.some((w) => w.focus === 'Pull')).toBe(true);
+  });
+
+  it('supports updating logged workout properties and deleting logged workouts/sets', () => {
+    const exercises = listExercises(db);
+    const bench = exercises.find((e) => e.name.toLowerCase().includes('bench')) || exercises[0];
+
+    const w = startWorkout(db, {
+      date: '2026-10-15',
+      focus: 'Push',
+      planned_time_min: 45,
+      energy_level: 3,
+      equipment: 'full_gym',
+    });
+
+    const s1 = logWorkoutSet(db, {
+      workout_id: w.id,
+      exercise_id: bench.id,
+      set_number: 1,
+      weight_kg: 50,
+      reps: 10,
+      planned_rest_sec: 90,
+      actual_rest_sec: 90,
+    });
+
+    const s2 = logWorkoutSet(db, {
+      workout_id: w.id,
+      exercise_id: bench.id,
+      set_number: 2,
+      weight_kg: 55,
+      reps: 8,
+      planned_rest_sec: 90,
+      actual_rest_sec: 90,
+    });
+
+    // 1. Update workout properties (date, focus, duration)
+    const updatedW = updateWorkout(db, w.id, {
+      date: '2026-10-16',
+      focus: 'Upper Body',
+      planned_time_min: 60,
+    });
+    expect(updatedW.date).toBe('2026-10-16');
+    expect(updatedW.focus).toBe('Upper Body');
+    expect(updatedW.planned_time_min).toBe(60);
+
+    // 2. Update set values
+    const updatedSet = updateWorkoutSet(db, s1.id, { weight_kg: 60, reps: 12 });
+    expect(updatedSet.weight_kg).toBe(60);
+    expect(updatedSet.reps).toBe(12);
+
+    // 3. Delete a set
+    deleteWorkoutSet(db, s2.id);
+    const remainingSets = getWorkoutSets(db, w.id);
+    expect(remainingSets.length).toBe(1);
+    expect(remainingSets[0].id).toBe(s1.id);
+
+    // 4. Delete the entire workout
+    deleteWorkout(db, w.id);
+    const checkDeleted = db.prepare('SELECT * FROM workouts WHERE id = ?').get(w.id);
+    expect(checkDeleted).toBeUndefined();
+    const checkSetsDeleted = db.prepare('SELECT * FROM workout_sets WHERE workout_id = ?').all(w.id);
+    expect(checkSetsDeleted.length).toBe(0);
   });
 });
 

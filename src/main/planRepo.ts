@@ -51,6 +51,15 @@ export function getProfile(db: Database.Database): ProfileWithMeta | null {
   };
 }
 
+export function deleteProfile(db: Database.Database): void {
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM user_profile WHERE id = 1').run();
+    db.prepare('DELETE FROM user_plan WHERE id = 1').run();
+    db.prepare("INSERT INTO app_meta (key, value) VALUES ('onboarding_skipped', 'false') ON CONFLICT(key) DO UPDATE SET value = 'false'").run();
+  });
+  tx();
+}
+
 export function saveProfile(
   db: Database.Database,
   profile: UserProfileInput

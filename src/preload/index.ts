@@ -11,6 +11,7 @@ const api: FormaAPI = {
 
   // Profile & Plan
   getProfile: () => ipcRenderer.invoke('plan:getProfile'),
+  clearProfile: () => ipcRenderer.invoke('plan:clearProfile'),
   saveProfile: (profile) => ipcRenderer.invoke('plan:saveProfile', profile),
   getPlan: () => ipcRenderer.invoke('plan:getPlan'),
   previewPlanUpdate: () => ipcRenderer.invoke('plan:previewUpdate'),
@@ -27,6 +28,10 @@ const api: FormaAPI = {
   logWorkoutSet: (set) => ipcRenderer.invoke('workout:logSet', set),
   undoLastWorkoutSet: (workoutId) => ipcRenderer.invoke('workout:undoSet', workoutId),
   cancelWorkout: (workoutId) => ipcRenderer.invoke('workout:cancel', workoutId),
+  updateWorkout: (workoutId, updates) => ipcRenderer.invoke('workout:update', workoutId, updates),
+  deleteWorkout: (workoutId) => ipcRenderer.invoke('workout:delete', workoutId),
+  deleteWorkoutSet: (setId) => ipcRenderer.invoke('workout:deleteSet', setId),
+  updateWorkoutSet: (setId, updates) => ipcRenderer.invoke('workout:updateSet', setId, updates),
   getWorkoutSets: (workoutId) => ipcRenderer.invoke('workout:getSets', workoutId),
   finishWorkout: (summary) => ipcRenderer.invoke('workout:finish', summary),
   getActiveWorkout: () => ipcRenderer.invoke('workout:getActive'),
