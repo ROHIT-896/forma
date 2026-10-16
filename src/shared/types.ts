@@ -62,6 +62,7 @@ export interface FormaAPI {
   }>;
   acceptPlanUpdate: (newPlan: YourPlan) => Promise<void>;
   setPlanOverrides: (overrides: PlanOverrides | null) => Promise<YourPlan>;
+  updateSchedule: (newSchedule: Array<{ day: number; day_name: string; focus: string; is_rest: boolean }>) => Promise<YourPlan>;
   getMessMode: () => Promise<boolean>;
   setMessMode: (enabled: boolean) => Promise<void>;
   getOnboardingSkipped: () => Promise<boolean>;

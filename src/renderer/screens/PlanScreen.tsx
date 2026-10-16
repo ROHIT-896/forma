@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
   TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp,
   RefreshCw, Check, AlertCircle, Scale, Dumbbell, Leaf, Egg, Drumstick,
+  Edit3, Save, RotateCcw, Clock,
 } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
-import type { YourPlan, PlanDiffItem, ProteinPlanItem, MealType } from '../../engine/types';
+import type { YourPlan, PlanDiffItem, ProteinPlanItem, MealType, WorkoutSplitPlan } from '../../engine/types';
 
 const GOAL_LABEL: Record<string, string> = {
   gain_muscle: 'Build Muscle',
@@ -162,6 +163,225 @@ function ProteinRow({ item }: { item: ProteinPlanItem }) {
         <div className="text-sm font-semibold text-white">{item.protein_g}g</div>
         <div className="text-[11px] text-slate-500">{item.calories} kcal</div>
       </div>
+    </div>
+  );
+}
+
+// ─── Schedule Editor ─────────────────────────────────────────────────────────
+function ScheduleEditor({
+  workout,
+  onScheduleUpdated,
+}: {
+  workout: WorkoutSplitPlan;
+  onScheduleUpdated: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [schedule, setSchedule] = useState(workout.weekly_schedule);
+  const [workoutTime, setWorkoutTime] = useState('18:00');
+  const [saving, setSaving] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+
+  useEffect(() => {
+    window.formaAPI?.getSettings().then((s) => {
+      if (s?.notifications?.workoutTime) {
+        setWorkoutTime(s.notifications.workoutTime);
+      }
+    });
+  }, []);
+
+  // Split's recommended options first, followed by all other standard focuses
+  const primaryOptions = (() => {
+    switch (workout.split_type) {
+      case 'Push / Pull / Legs':
+        return ['Push', 'Pull', 'Legs'];
+      case 'Upper / Lower':
+        return ['Upper', 'Lower'];
+      case 'Full Body':
+      default:
+        return ['Full Body'];
+    }
+  })();
+  const allFocuses = ['Upper', 'Lower', 'Push', 'Pull', 'Legs', 'Full Body'];
+  const focusOptions = Array.from(new Set([...primaryOptions, ...allFocuses]));
+
+  const handleToggleRest = (dayIndex: number) => {
+    setSchedule((prev) =>
+      prev.map((d) =>
+        d.day === dayIndex
+          ? { ...d, is_rest: !d.is_rest, focus: d.is_rest ? focusOptions[0] : 'Rest' }
+          : d
+      )
+    );
+  };
+
+  const handleChangeFocus = (dayIndex: number, newFocus: string) => {
+    setSchedule((prev) =>
+      prev.map((d) =>
+        d.day === dayIndex ? { ...d, focus: newFocus, is_rest: false } : d
+      )
+    );
+    setSelectedDay(null);
+  };
+
+  const handleSave = async () => {
+    if (!window.formaAPI) return;
+    setSaving(true);
+    try {
+      await window.formaAPI.updateSchedule(schedule);
+      const curSettings = await window.formaAPI.getSettings();
+      await window.formaAPI.saveSettings({
+        notifications: {
+          ...curSettings.notifications,
+          workoutTime,
+        },
+      });
+      onScheduleUpdated();
+      setEditing(false);
+      setSelectedDay(null);
+    } catch (err) {
+      console.error('Failed to update schedule:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setSchedule(workout.weekly_schedule);
+    setEditing(false);
+    setSelectedDay(null);
+  };
+
+  const activeCount = schedule.filter((d) => !d.is_rest).length;
+
+  return (
+    <div className="bg-[#1A1D25] border border-[#272B36] rounded-xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Dumbbell className="w-4 h-4 text-slate-400" />
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            {workout.split_type} · {activeCount}×/week
+          </h3>
+        </div>
+        {!editing ? (
+          <button
+            onClick={() => setEditing(true)}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] text-slate-400 hover:text-white bg-[#14171E] hover:bg-[#272B36] border border-[#272B36] transition cursor-pointer"
+          >
+            <Edit3 className="w-3 h-3" /> Edit Schedule & Time
+          </button>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleCancel}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] text-slate-400 hover:text-white bg-[#14171E] hover:bg-[#272B36] border border-[#272B36] transition cursor-pointer"
+            >
+              <RotateCcw className="w-3 h-3" /> Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] text-black font-bold bg-emerald-500 hover:bg-emerald-600 transition cursor-pointer disabled:opacity-50"
+            >
+              <Save className="w-3 h-3" /> {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Preferred Workout Time Banner */}
+      <div className="flex items-center justify-between text-xs text-slate-400 bg-[#14171E] border border-[#272B36] rounded-xl px-3.5 py-2 mb-3">
+        <div className="flex items-center gap-2">
+          <Clock className="w-3.5 h-3.5 text-slate-400" />
+          <span className="font-medium">Preferred Workout Time:</span>
+        </div>
+        {editing ? (
+          <input
+            type="time"
+            value={workoutTime}
+            onChange={(e) => setWorkoutTime(e.target.value)}
+            className="bg-[#1A1D25] border border-[#272B36] rounded-lg px-2.5 py-1 text-xs text-white font-mono outline-none focus:border-emerald-500"
+          />
+        ) : (
+          <span className="font-mono text-emerald-400 font-semibold">{workoutTime}</span>
+        )}
+      </div>
+
+      {/* Day Pills */}
+      <div className="grid grid-cols-7 gap-1 mb-3">
+        {schedule.map((day) => (
+          <button
+            key={day.day}
+            onClick={() => {
+              if (editing) {
+                setSelectedDay(selectedDay === day.day ? null : day.day);
+              }
+            }}
+            className={`flex flex-col items-center p-1.5 rounded-lg text-center transition
+              ${editing ? 'cursor-pointer hover:ring-1 hover:ring-emerald-500/50' : ''}
+              ${selectedDay === day.day ? 'ring-2 ring-emerald-400' : ''}
+              ${day.is_rest
+                ? 'bg-[#14171E] text-slate-600'
+                : 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400'}`}
+          >
+            <div className="text-[10px] font-bold">{day.day_name.slice(0, 1)}</div>
+            <div className="text-[9px] mt-0.5 truncate w-full text-center">
+              {day.is_rest ? 'Rest' : day.focus.split(' ')[0]}
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* Inline Editor for Selected Day */}
+      {editing && selectedDay !== null && (() => {
+        const day = schedule.find((d) => d.day === selectedDay);
+        if (!day) return null;
+        return (
+          <div className="bg-[#14171E] border border-[#272B36] rounded-xl p-3 mb-3 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-white">{day.day_name}</span>
+              <button
+                onClick={() => handleToggleRest(day.day)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition cursor-pointer border ${
+                  day.is_rest
+                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25'
+                    : 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20'
+                }`}
+              >
+                {day.is_rest ? '→ Set as Workout Day' : '→ Set as Rest Day'}
+              </button>
+            </div>
+            {!day.is_rest && (
+              <div>
+                <p className="text-[11px] text-slate-500 mb-1.5">Focus Area:</p>
+                <div className="flex gap-1.5 flex-wrap">
+                  {focusOptions.map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => handleChangeFocus(day.day, f)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer border ${
+                        day.focus === f
+                          ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
+                          : 'bg-[#1A1D25] border-[#272B36] text-slate-400 hover:text-white hover:border-slate-600'
+                      }`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {!editing && workout.why && (
+        <p className="text-[11px] text-slate-500 leading-relaxed">{workout.why}</p>
+      )}
+      {editing && (
+        <p className="text-[10px] text-slate-600 italic">
+          Tap any day pill above to change its focus or toggle rest. Adjust preferred workout time as needed, then click Save.
+        </p>
+      )}
     </div>
   );
 }
@@ -371,28 +591,8 @@ export default function PlanScreen() {
           )}
         </div>
 
-        {/* Workout Split */}
-        <div className="bg-[#1A1D25] border border-[#272B36] rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Dumbbell className="w-4 h-4 text-slate-400" />
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              {workout.split_type} · {workout.days_per_week}×/week
-            </h3>
-          </div>
-          <div className="grid grid-cols-7 gap-1 mb-3">
-            {workout.weekly_schedule.map((day) => (
-              <div
-                key={day.day}
-                className={`flex flex-col items-center p-1.5 rounded-lg text-center
-                  ${day.is_rest ? 'bg-[#14171E] text-slate-600' : 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400'}`}
-              >
-                <div className="text-[10px] font-bold">{day.day_name.slice(0, 1)}</div>
-                <div className="text-[9px] mt-0.5 truncate w-full text-center">{day.is_rest ? 'Rest' : day.focus.split(' ')[0]}</div>
-              </div>
-            ))}
-          </div>
-          <p className="text-[11px] text-slate-500 leading-relaxed">{workout.why}</p>
-        </div>
+        {/* Workout Split — Editable Schedule */}
+        <ScheduleEditor workout={workout} onScheduleUpdated={() => refreshPlan()} />
 
         {/* Manual Overrides */}
         <OverridesSection plan={plan} />

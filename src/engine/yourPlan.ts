@@ -5,11 +5,13 @@ import type {
   PlanDiffItem,
   ProteinPlanItem,
   TodaysPlannedSession,
+  MissedWorkoutAdaptation,
   MealType,
   DietaryType,
 } from './types';
 import { generateDietPlan } from './diet';
 import { generateWorkoutPlan } from './plan';
+import { handleMissedWorkoutsAndGaps } from './adaptation';
 
 /**
  * Builds meal-by-meal protein guidance using Indian mess / student staples.
@@ -316,38 +318,112 @@ export function resolveTodaysPlannedSession(
     };
   }
 
-  // Date parsing to determine day index (Monday=0 ... Sunday=6 or JS 0=Sunday)
-  // Our weekly_schedule is 1: Mon, 2: Tue, 3: Wed, 4: Thu, 5: Fri, 6: Sat, 7: Sun
+  // Date parsing to determine day index (Monday=1 ... Sunday=7 matching schedule)
   const dateObj = new Date(todayDateStr);
   const jsDay = dateObj.getDay(); // 0 is Sunday, 1 is Monday
-  const dayIndex = jsDay === 0 ? 7 : jsDay; // 1-7 matching schedule
+  const dayIndex = jsDay === 0 ? 7 : jsDay;
 
   const scheduledToday = schedule.find((s) => s.day === dayIndex) || schedule[0];
 
-  // Check recent completed workouts (yesterday)
   const sortedWorkouts = [...completedWorkouts]
     .filter((w) => w.status === 'completed')
     .sort((a, b) => b.date.localeCompare(a.date));
 
   const lastCompleted = sortedWorkouts[0];
 
-  if (scheduledToday.is_rest) {
-    // If today is scheduled as rest day, check if user missed a workout yesterday
-    // If yesterday was a planned workout day and user didn't work out:
-    const yesterdayDayIndex = dayIndex === 1 ? 7 : dayIndex - 1;
-    const scheduledYesterday = schedule.find((s) => s.day === yesterdayDayIndex);
+  // Calculate days since last completed workout
+  let daysSinceLastWorkout = 0;
+  if (lastCompleted) {
+    const lastDate = new Date(lastCompleted.date);
+    const diffMs = dateObj.getTime() - lastDate.getTime();
+    daysSinceLastWorkout = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+  }
 
-    if (scheduledYesterday && !scheduledYesterday.is_rest) {
-      const workedOutYesterday = sortedWorkouts.some((w) => w.date < todayDateStr && w.date >= todayDateStr.slice(0, 8));
-      if (!workedOutYesterday && scheduledYesterday.focus !== lastCompleted?.focus) {
-        return {
-          focus: scheduledYesterday.focus,
-          is_rest_day: false,
-          day_name: scheduledToday.day_name,
-          message: `Rolled forward missed ${scheduledYesterday.focus} session from yesterday`,
-          suggested_focus: scheduledYesterday.focus,
+  // Detect missed workout sessions in the current week (from Monday up to yesterday)
+  let missedSessionsThisWeek = 0;
+  let mostRecentMissed: { day: number; day_name: string; focus: string; date: string } | null = null;
+
+  const daysElapsedThisWeek = dayIndex - 1; // 0 on Monday, 1 on Tuesday, 2 on Wednesday, etc.
+  for (let i = 1; i <= daysElapsedThisWeek; i++) {
+    const checkDate = new Date(dateObj);
+    checkDate.setDate(checkDate.getDate() - i);
+    const checkDateStr = checkDate.toISOString().slice(0, 10);
+    const checkJsDay = checkDate.getDay();
+    const checkDayIndex = checkJsDay === 0 ? 7 : checkJsDay;
+    const scheduledForDate = schedule.find((s) => s.day === checkDayIndex);
+
+    if (scheduledForDate && !scheduledForDate.is_rest) {
+      const hadWorkout = sortedWorkouts.some((w) => w.date === checkDateStr);
+      if (!hadWorkout) {
+        missedSessionsThisWeek++;
+        if (!mostRecentMissed) {
+          mostRecentMissed = {
+            day: scheduledForDate.day,
+            day_name: scheduledForDate.day_name,
+            focus: scheduledForDate.focus,
+            date: checkDateStr,
+          };
+        }
+      }
+    }
+  }
+
+  // If today is Monday, also check if Sunday was a scheduled session that was missed
+  if (daysElapsedThisWeek === 0) {
+    const yesterdayDate = new Date(dateObj);
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterdayDateStr = yesterdayDate.toISOString().slice(0, 10);
+    const scheduledSun = schedule.find((s) => s.day === 7);
+    if (scheduledSun && !scheduledSun.is_rest) {
+      const hadWorkout = sortedWorkouts.some((w) => w.date === yesterdayDateStr);
+      if (!hadWorkout) {
+        missedSessionsThisWeek = 1;
+        mostRecentMissed = {
+          day: scheduledSun.day,
+          day_name: scheduledSun.day_name,
+          focus: scheduledSun.focus,
+          date: yesterdayDateStr,
         };
       }
+    }
+  }
+
+  const targetFocus = scheduledToday.is_rest
+    ? mostRecentMissed?.focus || 'Full Body'
+    : scheduledToday.focus;
+
+  const gapResult = handleMissedWorkoutsAndGaps({
+    daysSinceLastWorkout,
+    missedSessionsThisWeek,
+    nextScheduledFocus: targetFocus,
+    previousCompletedFocus: lastCompleted?.focus,
+  });
+
+  const adaptation: MissedWorkoutAdaptation | undefined =
+    missedSessionsThisWeek > 0 || daysSinceLastWorkout >= 7
+      ? {
+          has_missed_workout: true,
+          missed_day_name: mostRecentMissed?.day_name,
+          missed_focus: mostRecentMissed?.focus,
+          missed_date: mostRecentMissed?.date,
+          action: gapResult.action,
+          load_multiplier: gapResult.loadMultiplier,
+          volume_multiplier: gapResult.volumeMultiplier,
+          message: gapResult.message,
+        }
+      : undefined;
+
+  // Case A: Today is scheduled as a rest day
+  if (scheduledToday.is_rest) {
+    if (mostRecentMissed && gapResult.action === 'roll_forward') {
+      return {
+        focus: mostRecentMissed.focus,
+        is_rest_day: false,
+        day_name: scheduledToday.day_name,
+        message: `Rolled forward missed ${mostRecentMissed.focus} session from ${mostRecentMissed.day_name}`,
+        suggested_focus: mostRecentMissed.focus,
+        adaptation,
+      };
     }
 
     return {
@@ -356,23 +432,35 @@ export function resolveTodaysPlannedSession(
       day_name: scheduledToday.day_name,
       message: 'Rest day on your plan — a session is still fine if you feel like it.',
       suggested_focus: 'Full Body',
+      adaptation,
     };
   }
 
+  // Case B: Today is a scheduled workout day
+  let finalFocus = scheduledToday.focus;
+  // If user completed a workout yesterday with the same focus, avoid back-to-back same muscle fatigue
+  const yesterdayStr = new Date(dateObj.getTime() - 86400000).toISOString().slice(0, 10);
+  if (lastCompleted && lastCompleted.date === yesterdayStr && lastCompleted.focus === finalFocus) {
+    const alt = schedule.find((s) => !s.is_rest && s.focus !== finalFocus);
+    if (alt) finalFocus = alt.focus;
+  }
 
-  // Check for avoiding back-to-back same muscle focus
-  let targetFocus = scheduledToday.focus;
-  if (lastCompleted && lastCompleted.focus === targetFocus) {
-    // If user somehow already did this exact focus yesterday, pick another active day's focus
-    const alt = schedule.find((s) => !s.is_rest && s.focus !== targetFocus);
-    if (alt) targetFocus = alt.focus;
+  let message = `Today's scheduled session: ${finalFocus}`;
+  if (gapResult.action === 'roll_forward' && mostRecentMissed && mostRecentMissed.focus !== finalFocus) {
+    message = `Option to roll forward missed ${mostRecentMissed.focus} (${mostRecentMissed.day_name}), or proceed with ${finalFocus}.`;
+  } else if (gapResult.action === 'minor_deload' || gapResult.action === 'reacclimation') {
+    message = gapResult.message;
   }
 
   return {
-    focus: targetFocus,
+    focus: finalFocus,
     is_rest_day: false,
     day_name: scheduledToday.day_name,
-    message: `Today's scheduled session: ${targetFocus}`,
-    suggested_focus: targetFocus,
+    message,
+    suggested_focus:
+      gapResult.action === 'roll_forward' && mostRecentMissed
+        ? mostRecentMissed.focus
+        : finalFocus,
+    adaptation,
   };
 }

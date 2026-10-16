@@ -307,6 +307,22 @@ export function setPlanOverrides(
   return updatedPlan;
 }
 
+export function updateSchedule(
+  db: Database.Database,
+  newSchedule: Array<{ day: number; day_name: string; focus: string; is_rest: boolean }>
+): YourPlan {
+  const now = new Date().toISOString();
+  db.prepare('UPDATE user_plan SET weekly_schedule_json = ?, updated_at = ? WHERE id = 1').run(
+    JSON.stringify(newSchedule),
+    now
+  );
+  const updatedPlan = getPlan(db);
+  if (!updatedPlan) {
+    throw new Error('Failed to load plan after updating schedule.');
+  }
+  return updatedPlan;
+}
+
 export function getMessMode(db: Database.Database): boolean {
   const row = db.prepare("SELECT value FROM app_meta WHERE key = 'mess_mode'").get() as any;
   return row ? row.value === '1' || row.value === 'true' : true; // default true for Indian mess/hostel

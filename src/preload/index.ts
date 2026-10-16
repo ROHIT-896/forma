@@ -17,6 +17,7 @@ const api: FormaAPI = {
   previewPlanUpdate: () => ipcRenderer.invoke('plan:previewUpdate'),
   acceptPlanUpdate: (newPlan) => ipcRenderer.invoke('plan:acceptUpdate', newPlan),
   setPlanOverrides: (overrides) => ipcRenderer.invoke('plan:setOverrides', overrides),
+  updateSchedule: (newSchedule) => ipcRenderer.invoke('plan:updateSchedule', newSchedule),
   getMessMode: () => ipcRenderer.invoke('meta:getMessMode'),
   setMessMode: (enabled) => ipcRenderer.invoke('meta:setMessMode', enabled),
   getOnboardingSkipped: () => ipcRenderer.invoke('meta:getOnboardingSkipped'),

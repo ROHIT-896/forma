@@ -52,6 +52,7 @@ interface WorkoutState {
   skipRestTimer: () => Promise<void>;
   updateRestTick: () => Promise<void>;
   swapExercise: (oldExerciseId: string, newExercise: ExerciseDefinition) => void;
+  setCurrentExerciseIndex: (idx: number) => void;
   finishCurrentWorkout: () => Promise<WorkoutSummary | null>;
   cancelCurrentWorkout: () => Promise<void>;
   resetWorkoutState: () => void;
@@ -328,6 +329,21 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       return es;
     });
     set({ exerciseStates: updated });
+  },
+
+  setCurrentExerciseIndex: (idx: number) => {
+    const { exerciseStates } = get();
+    if (idx < 0 || idx >= exerciseStates.length) return;
+    const targetEx = exerciseStates[idx];
+    const nextSetNum = targetEx.logged_sets.length + 1;
+    const targetSet = targetEx.sets[nextSetNum - 1] || targetEx.sets[0];
+    set({
+      currentExerciseIndex: idx,
+      currentSetNumber: Math.min(nextSetNum, targetEx.sets.length),
+      inputWeightKg: targetSet?.prescribed_weight_kg || targetEx.previous_weight_kg || 40,
+      inputReps: targetSet?.target_reps_max || 10,
+      inputRir: targetSet?.target_rir ?? 2,
+    });
   },
 
   finishCurrentWorkout: async () => {

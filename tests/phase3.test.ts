@@ -13,6 +13,7 @@ import {
   setPlanOverrides,
   getMessMode,
   setMessMode,
+  updateSchedule,
 } from '../src/main/planRepo';
 import {
   listFoods,
@@ -342,7 +343,7 @@ describe('Phase 3: Diet Logging, Your Plan, Onboarding & Adaptation', () => {
     const shawarma = upsertFood(db, {
       name: 'Chicken Shawarma Roll (Outside)',
       category: 'Outside / Custom',
-      dietary_type: 'non-veg',
+      dietary_type: 'non_veg',
       default_portion_unit: 'serving',
       portion_description: '1 standard roll',
       estimated_calories: 420,
@@ -378,5 +379,65 @@ describe('Phase 3: Diet Logging, Your Plan, Onboarding & Adaptation', () => {
     const allFoods = listFoods(db);
     const found = allFoods.find((f) => f.name === 'Chicken Shawarma Roll (Outside)');
     expect(found).toBeDefined();
+  });
+
+  it('supports updating custom weekly schedule (swapping days and rest days)', () => {
+    saveProfile(db, sampleProfile);
+    const planBefore = getPlan(db)!;
+    expect(planBefore).toBeDefined();
+
+    // Custom new schedule: Mon=Legs, Tue=Rest, Wed=Push, Thu=Pull, Fri=Rest, Sat=Full Body, Sun=Rest
+    const customSchedule = [
+      { day: 1, day_name: 'Monday', focus: 'Legs', is_rest: false },
+      { day: 2, day_name: 'Tuesday', focus: 'Rest', is_rest: true },
+      { day: 3, day_name: 'Wednesday', focus: 'Push', is_rest: false },
+      { day: 4, day_name: 'Thursday', focus: 'Pull', is_rest: false },
+      { day: 5, day_name: 'Friday', focus: 'Rest', is_rest: true },
+      { day: 6, day_name: 'Saturday', focus: 'Full Body', is_rest: false },
+      { day: 7, day_name: 'Sunday', focus: 'Rest', is_rest: true },
+    ];
+
+    const updatedPlan = updateSchedule(db, customSchedule);
+    expect(updatedPlan.workout.weekly_schedule).toEqual(customSchedule);
+
+    // Persists across fresh queries
+    const freshPlan = getPlan(db)!;
+    expect(freshPlan.workout.weekly_schedule[0].focus).toBe('Legs');
+    expect(freshPlan.workout.weekly_schedule[1].is_rest).toBe(true);
+    expect(freshPlan.workout.weekly_schedule[5].focus).toBe('Full Body');
+  });
+
+  it('adapts when a workout day is missed by detecting the gap and rolling forward or recommending deload', () => {
+    const plan = generateYourPlan(sampleProfile);
+    // Upper / Lower split:
+    // Mon (2026-10-12): Upper
+    // Tue (2026-10-13): Lower
+    // Wed (2026-10-14): Rest
+    // Thu (2026-10-15): Upper
+    // Fri (2026-10-16): Lower
+
+    // 1. User worked out Monday (Upper), but missed Tuesday (Lower). Today is Wednesday (Rest).
+    const workoutsWithMissedTue = [
+      { date: '2026-10-12', focus: 'Upper', status: 'completed' },
+    ];
+
+    const tuesdayFocus = plan.workout.weekly_schedule[1].focus;
+    const adaptedWed = resolveTodaysPlannedSession(plan, workoutsWithMissedTue, '2026-10-14');
+    expect(adaptedWed.adaptation).toBeDefined();
+    expect(adaptedWed.adaptation?.has_missed_workout).toBe(true);
+    expect(adaptedWed.adaptation?.missed_focus).toBe(tuesdayFocus);
+    // On rest day, rolls forward the missed session
+    expect(adaptedWed.focus).toBe(tuesdayFocus);
+    expect(adaptedWed.is_rest_day).toBe(false);
+
+    // 2. Long gap detection: last workout was 14 days ago
+    const workoutsLongAgo = [
+      { date: '2026-10-02', focus: 'Upper', status: 'completed' },
+    ];
+    const adaptedLongGap = resolveTodaysPlannedSession(plan, workoutsLongAgo, '2026-10-16');
+    expect(adaptedLongGap.adaptation?.has_missed_workout).toBe(true);
+    expect(adaptedLongGap.adaptation?.action).toBe('reacclimation');
+    expect(adaptedLongGap.adaptation?.load_multiplier).toBe(0.7);
+    expect(adaptedLongGap.adaptation?.volume_multiplier).toBe(0.6);
   });
 });

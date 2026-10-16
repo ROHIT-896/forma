@@ -156,6 +156,7 @@ function setupIPCHandlers(dbInfo: { dbPath: string; backupCount: number; schemaV
   ipcMain.handle('meta:setMessMode', async (_e, enabled) => planRepo.setMessMode(getDatabase(), enabled));
   ipcMain.handle('meta:getOnboardingSkipped', async () => planRepo.getOnboardingSkipped(getDatabase()));
   ipcMain.handle('meta:setOnboardingSkipped', async (_e, skipped) => planRepo.setOnboardingSkipped(getDatabase(), skipped));
+  ipcMain.handle('plan:updateSchedule', async (_e, newSchedule) => planRepo.updateSchedule(getDatabase(), newSchedule));
 
   // Workouts
   ipcMain.handle('workout:listExercises', async () => workoutRepo.listExercises(getDatabase()));

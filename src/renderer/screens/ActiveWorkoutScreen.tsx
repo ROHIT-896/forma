@@ -39,6 +39,7 @@ export default function ActiveWorkoutScreen() {
     skipRestTimer,
     updateRestTick,
     swapExercise,
+    setCurrentExerciseIndex,
     finishCurrentWorkout,
     cancelCurrentWorkout,
     startWorkout,
@@ -46,6 +47,8 @@ export default function ActiveWorkoutScreen() {
 
   const [allExercises, setAllExercises] = useState<ExerciseDefinition[]>([]);
   const [showSwapModal, setShowSwapModal] = useState(false);
+  const [swapTab, setSwapTab] = useState<'substitutions' | 'browse'>('substitutions');
+  const [swapSearch, setSwapSearch] = useState('');
   const weightInputRef = useRef<HTMLInputElement>(null);
 
   // Interval for ticking wall-clock rest timer
@@ -231,6 +234,35 @@ export default function ActiveWorkoutScreen() {
         </div>
       )}
 
+      {/* Exercise Navigation Tabs */}
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+        {exerciseStates.map((es, idx) => {
+          const isCurrent = idx === currentExerciseIndex;
+          const isDone = es.logged_sets.length >= es.sets.length;
+          return (
+            <button
+              key={`${es.exercise.id}-${idx}`}
+              type="button"
+              onClick={() => setCurrentExerciseIndex(idx)}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer flex items-center gap-2 border ${
+                isCurrent
+                  ? 'bg-emerald-500/20 border-emerald-500 text-white shadow-sm'
+                  : isDone
+                  ? 'bg-[#181B22] border-emerald-500/30 text-emerald-400/80 hover:bg-[#20242D]'
+                  : 'bg-[#181B22] border-[#272B36] text-slate-400 hover:text-slate-200 hover:border-slate-600'
+              }`}
+            >
+              <span>{idx + 1}. {es.exercise.name}</span>
+              {isDone ? (
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              ) : es.logged_sets.length > 0 ? (
+                <span className="text-[10px] text-amber-400 font-mono">({es.logged_sets.length}/{es.sets.length})</span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Main Active Exercise Card */}
       <div className="bg-[#181B22] border border-[#272B36] rounded-2xl p-6 space-y-6">
         {/* Exercise Header & Swap Button */}
@@ -383,32 +415,110 @@ export default function ActiveWorkoutScreen() {
             <h3 className="text-base font-bold text-white">
               Substitute for {currentEx.name}
             </h3>
-            <p className="text-xs text-slate-400">
-              Biochemically and biomechanically equivalent exercises targeting the same movement pattern ({currentEx.movement_pattern}).
-            </p>
 
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {substitutions.map((sub) => (
-                <button
-                  key={sub.id}
-                  onClick={() => {
-                    swapExercise(currentEx.id, sub);
-                    setShowSwapModal(false);
-                  }}
-                  className="w-full flex items-center justify-between p-3 rounded-xl bg-[#181B22] hover:bg-[#20242D] border border-[#272B36] hover:border-emerald-500/40 text-left transition cursor-pointer"
-                >
-                  <div>
-                    <div className="text-xs font-bold text-white">{sub.name}</div>
-                    <div className="text-[11px] text-slate-400 font-mono capitalize">{sub.equipment} • {sub.difficulty}</div>
-                  </div>
-                  <span className="text-xs text-emerald-400 font-semibold">Select →</span>
-                </button>
-              ))}
+            {/* Tabs: Substitutions vs Browse All */}
+            <div className="flex gap-1 bg-[#101217] p-1 rounded-xl">
+              <button
+                onClick={() => setSwapTab('substitutions')}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  swapTab === 'substitutions'
+                    ? 'bg-[#1A1D25] text-white shadow'
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                Substitutions ({substitutions.length})
+              </button>
+              <button
+                onClick={() => setSwapTab('browse')}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  swapTab === 'browse'
+                    ? 'bg-[#1A1D25] text-white shadow'
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                Browse All
+              </button>
             </div>
+
+            {swapTab === 'substitutions' ? (
+              <>
+                <p className="text-xs text-slate-400">
+                  Biomechanically equivalent exercises targeting the same movement pattern ({currentEx.movement_pattern}).
+                </p>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {substitutions.length === 0 ? (
+                    <p className="text-xs text-slate-500 text-center py-4">No direct substitutions available. Try Browse All.</p>
+                  ) : (
+                    substitutions.map((sub) => (
+                      <button
+                        key={sub.id}
+                        onClick={() => {
+                          swapExercise(currentEx.id, sub);
+                          setShowSwapModal(false);
+                          setSwapTab('substitutions');
+                          setSwapSearch('');
+                        }}
+                        className="w-full flex items-center justify-between p-3 rounded-xl bg-[#181B22] hover:bg-[#20242D] border border-[#272B36] hover:border-emerald-500/40 text-left transition cursor-pointer"
+                      >
+                        <div>
+                          <div className="text-xs font-bold text-white">{sub.name}</div>
+                          <div className="text-[11px] text-slate-400 font-mono capitalize">{sub.equipment} • {sub.difficulty}</div>
+                        </div>
+                        <span className="text-xs text-emerald-400 font-semibold">Select →</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="relative">
+                  <input
+                    value={swapSearch}
+                    onChange={(e) => setSwapSearch(e.target.value)}
+                    placeholder="Search all exercises…"
+                    className="w-full pl-3 pr-4 py-2 bg-[#181B22] border border-[#272B36] rounded-xl text-xs text-white placeholder-slate-600 outline-none focus:border-emerald-500/50"
+                    autoFocus
+                  />
+                </div>
+                <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                  {allExercises
+                    .filter((ex) =>
+                      ex.id !== currentEx.id &&
+                      ex.name.toLowerCase().includes(swapSearch.toLowerCase())
+                    )
+                    .slice(0, 30)
+                    .map((ex) => (
+                      <button
+                        key={ex.id}
+                        onClick={() => {
+                          swapExercise(currentEx.id, ex);
+                          setShowSwapModal(false);
+                          setSwapTab('substitutions');
+                          setSwapSearch('');
+                        }}
+                        className="w-full flex items-center justify-between p-3 rounded-xl bg-[#181B22] hover:bg-[#20242D] border border-[#272B36] hover:border-emerald-500/40 text-left transition cursor-pointer"
+                      >
+                        <div>
+                          <div className="text-xs font-bold text-white">{ex.name}</div>
+                          <div className="text-[11px] text-slate-400 font-mono capitalize">
+                            {ex.equipment} • {ex.primary_muscles.join(', ')} • {ex.difficulty}
+                          </div>
+                        </div>
+                        <span className="text-xs text-emerald-400 font-semibold">Select →</span>
+                      </button>
+                    ))}
+                </div>
+              </>
+            )}
 
             <div className="pt-2 flex justify-end">
               <button
-                onClick={() => setShowSwapModal(false)}
+                onClick={() => {
+                  setShowSwapModal(false);
+                  setSwapTab('substitutions');
+                  setSwapSearch('');
+                }}
                 className="px-4 py-2 bg-[#20242D] text-xs text-slate-300 rounded-xl hover:bg-[#282D3A] transition cursor-pointer"
               >
                 Cancel

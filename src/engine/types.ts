@@ -184,12 +184,24 @@ export interface PlanDiffItem {
   reason: string;
 }
 
+export interface MissedWorkoutAdaptation {
+  has_missed_workout: boolean;
+  missed_day_name?: string;
+  missed_focus?: string;
+  missed_date?: string;
+  action: 'proceed_normal' | 'roll_forward' | 'keep_schedule' | 'minor_deload' | 'reacclimation';
+  load_multiplier: number;
+  volume_multiplier: number;
+  message: string;
+}
+
 export interface TodaysPlannedSession {
   focus: string | null;
   is_rest_day: boolean;
   day_name: string;
   message: string;
   suggested_focus: string;
+  adaptation?: MissedWorkoutAdaptation;
 }
 
 export interface LoggedSet {
