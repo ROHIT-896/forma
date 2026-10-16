@@ -371,7 +371,7 @@ export function generateWorkoutSession(params: {
 export function getExerciseSubstitutions(
   exercise: ExerciseDefinition,
   catalog: ExerciseDefinition[],
-  userEquipment: EquipmentType
+  userEquipment: EquipmentType = 'full_gym'
 ): ExerciseDefinition[] {
   const validForEquipment = filterExercisesByEquipment(catalog, userEquipment);
   const subIds = new Set(exercise.substitution_ids);

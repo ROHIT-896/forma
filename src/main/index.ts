@@ -3,6 +3,9 @@ import path from 'path';
 import fs from 'fs';
 import { initDatabase, getDbPath, getDatabase } from './db';
 import type { AppInfo, DBPingResult } from '../shared/types';
+import * as workoutRepo from './workoutRepo';
+import * as dietRepo from './dietRepo';
+import * as planRepo from './planRepo';
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -12,10 +15,10 @@ const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1100,
-    height: 750,
-    minWidth: 900,
-    minHeight: 600,
+    width: 1180,
+    height: 800,
+    minWidth: 960,
+    minHeight: 650,
     title: 'FORMA',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },
@@ -25,7 +28,7 @@ function createWindow() {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false, // Allows preload to require electron modules safely with contextBridge
+      sandbox: false,
     },
   });
 
@@ -45,7 +48,6 @@ function createWindow() {
 }
 
 function setupTray() {
-  // Empty tray initialized on demand or with transparent/blank icon
   const icon = nativeImage.createEmpty();
   tray = new Tray(icon);
   tray.setToolTip('FORMA');
@@ -73,6 +75,7 @@ function setupTray() {
 }
 
 function setupIPCHandlers(dbInfo: { dbPath: string; backupCount: number; schemaVersion: number }) {
+  // System & Health
   ipcMain.handle('db:ping', async (): Promise<DBPingResult> => {
     const db = getDatabase();
     const versionRow = db.prepare('SELECT sqlite_version() AS version').get() as { version: string };
@@ -103,6 +106,9 @@ function setupIPCHandlers(dbInfo: { dbPath: string; backupCount: number; schemaV
       sqliteVersion: versionRow.version,
       platform: process.platform,
       arch: process.arch,
+      build_mode: process.env.NODE_ENV ?? 'production',
+      node_version: process.version,
+      electron_version: process.versions.electron ?? '—',
     };
   });
 
@@ -135,13 +141,52 @@ function setupIPCHandlers(dbInfo: { dbPath: string; backupCount: number; schemaV
       new Notification({ title, body, silent: false }).show();
     }
   });
+
+  // Profile & Plan
+  ipcMain.handle('plan:getProfile', async () => planRepo.getProfile(getDatabase()));
+  ipcMain.handle('plan:saveProfile', async (_e, profile) => planRepo.saveProfile(getDatabase(), profile));
+  ipcMain.handle('plan:getPlan', async () => planRepo.getPlan(getDatabase()));
+  ipcMain.handle('plan:previewUpdate', async () => planRepo.previewPlanUpdate(getDatabase()));
+  ipcMain.handle('plan:acceptUpdate', async (_e, newPlan) => planRepo.acceptPlanUpdate(getDatabase(), newPlan));
+  ipcMain.handle('plan:setOverrides', async (_e, overrides) => planRepo.setPlanOverrides(getDatabase(), overrides));
+  ipcMain.handle('meta:getMessMode', async () => planRepo.getMessMode(getDatabase()));
+  ipcMain.handle('meta:setMessMode', async (_e, enabled) => planRepo.setMessMode(getDatabase(), enabled));
+  ipcMain.handle('meta:getOnboardingSkipped', async () => planRepo.getOnboardingSkipped(getDatabase()));
+  ipcMain.handle('meta:setOnboardingSkipped', async (_e, skipped) => planRepo.setOnboardingSkipped(getDatabase(), skipped));
+
+  // Workouts
+  ipcMain.handle('workout:listExercises', async () => workoutRepo.listExercises(getDatabase()));
+  ipcMain.handle('workout:start', async (_e, params) => workoutRepo.startWorkout(getDatabase(), params));
+  ipcMain.handle('workout:logSet', async (_e, set) => workoutRepo.logWorkoutSet(getDatabase(), set));
+  ipcMain.handle('workout:undoSet', async (_e, workoutId) => workoutRepo.undoLastWorkoutSet(getDatabase(), workoutId));
+  ipcMain.handle('workout:getSets', async (_e, workoutId) => workoutRepo.getWorkoutSets(getDatabase(), workoutId));
+  ipcMain.handle('workout:finish', async (_e, summary) => workoutRepo.finishWorkout(getDatabase(), summary));
+  ipcMain.handle('workout:getActive', async () => workoutRepo.getActiveWorkout(getDatabase()));
+  ipcMain.handle('workout:getExerciseHistory', async (_e, exerciseId) => workoutRepo.getExerciseHistory(getDatabase(), exerciseId));
+  ipcMain.handle('workout:getRecent', async (_e, limit) => workoutRepo.getRecentWorkouts(getDatabase(), limit));
+
+  // Diet & Tracking
+  ipcMain.handle('diet:listFoods', async () => dietRepo.listFoods(getDatabase()));
+  ipcMain.handle('diet:upsertFood', async (_e, food) => dietRepo.upsertFood(getDatabase(), food));
+  ipcMain.handle('diet:logFood', async (_e, entry) => dietRepo.logFood(getDatabase(), entry));
+  ipcMain.handle('diet:deleteFoodLog', async (_e, id) => dietRepo.deleteFoodLog(getDatabase(), id));
+  ipcMain.handle('diet:getDayDiet', async (_e, dateStr) => dietRepo.getDayDiet(getDatabase(), dateStr));
+  ipcMain.handle('diet:repeatYesterdayMeal', async (_e, dateStr, mealType) => dietRepo.repeatYesterdayMeal(getDatabase(), dateStr, mealType));
+  ipcMain.handle('diet:saveMeal', async (_e, name, mealType, items) => dietRepo.saveMeal(getDatabase(), name, mealType, items));
+  ipcMain.handle('diet:listSavedMeals', async () => dietRepo.listSavedMeals(getDatabase()));
+  ipcMain.handle('diet:logSavedMeal', async (_e, savedMealId, dateStr, mealType) => dietRepo.logSavedMeal(getDatabase(), savedMealId, dateStr, mealType));
+  ipcMain.handle('diet:deleteSavedMeal', async (_e, savedMealId) => dietRepo.deleteSavedMeal(getDatabase(), savedMealId));
+  ipcMain.handle('diet:logQuickProtein', async (_e, foodId, dateStr, isMessMode) => dietRepo.logQuickProtein(getDatabase(), foodId, dateStr, isMessMode));
+  ipcMain.handle('diet:addWater', async (_e, dateStr, amountMl) => dietRepo.addWater(getDatabase(), dateStr, amountMl));
+  ipcMain.handle('diet:undoLastWater', async (_e, dateStr) => dietRepo.undoLastWater(getDatabase(), dateStr));
+  ipcMain.handle('diet:logWeight', async (_e, dateStr, weightKg) => dietRepo.logWeight(getDatabase(), dateStr, weightKg));
+  ipcMain.handle('diet:getWeightHistory', async (_e, limitDays) => dietRepo.getWeightHistory(getDatabase(), limitDays));
+  ipcMain.handle('diet:evaluateWeightTrend', async (_e, goal) => dietRepo.evaluateWeightTrendForGoal(getDatabase(), goal));
 }
 
 // App lifecycle
 app.whenReady().then(() => {
-  // Initialize Database in main process
   const dbInfo = initDatabase();
-
   setupIPCHandlers(dbInfo);
   setupTray();
   createWindow();

@@ -120,3 +120,21 @@ export function analyzeRestPatterns(sets: Array<{
     insightMessage: null,
   };
 }
+
+/**
+ * Calculates elapsed rest seconds from a set logged timestamp to now.
+ * Pure wall-clock timestamp calculation.
+ */
+export function calculateElapsedRestSec(setLoggedTimestampMs: number): number {
+  return Math.max(0, Math.round((Date.now() - setLoggedTimestampMs) / 1000));
+}
+
+/**
+ * Formats seconds into MM:SS.
+ */
+export function formatRestTimer(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+

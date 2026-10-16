@@ -326,18 +326,56 @@ function applyMigrations(db: Database.Database): number {
         );
       `,
     },
+    {
+      version: 3,
+      name: 'workout_and_diet_extensions',
+      sql: `
+        CREATE TABLE IF NOT EXISTS saved_meals (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          meal_type TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS saved_meal_items (
+          id TEXT PRIMARY KEY,
+          saved_meal_id TEXT NOT NULL,
+          food_id TEXT NOT NULL,
+          portion_quantity REAL NOT NULL,
+          portion_unit TEXT NOT NULL,
+          calories REAL NOT NULL,
+          protein REAL NOT NULL,
+          FOREIGN KEY (saved_meal_id) REFERENCES saved_meals(id) ON DELETE CASCADE,
+          FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE CASCADE
+        );
+      `,
+    },
   ];
 
   for (const m of migrations) {
     if (m.version > currentVersion) {
       const applyTx = db.transaction(() => {
         db.exec(m.sql);
+
+        // Safe column addition for user_plan.overrides_json in migration 3
+        if (m.version === 3) {
+          try {
+            const tableCols = db.pragma('table_info(user_plan)') as Array<{ name: string }>;
+            if (!tableCols.some((col) => col.name === 'overrides_json')) {
+              db.exec('ALTER TABLE user_plan ADD COLUMN overrides_json TEXT;');
+            }
+          } catch {
+            // ignore if already present
+          }
+        }
+
         db.prepare("INSERT INTO schema_migrations (version, applied_at) VALUES (?, datetime('now'))").run(m.version);
       });
       applyTx();
       console.log(`Applied migration ${m.version}: ${m.name}`);
     }
   }
+
 
   // Seed default exercises and foods if table is empty
   seedInitialData(db);

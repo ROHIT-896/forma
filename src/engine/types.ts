@@ -137,3 +137,98 @@ export interface ProgressionResult {
   suggest_substitute: boolean;
   suggest_deload: boolean;
 }
+
+export type MealType = 'breakfast' | 'lunch' | 'snacks' | 'dinner' | 'extra';
+
+export interface ProteinPlanItem {
+  meal_type: MealType;
+  food_id: string;
+  food_name: string;
+  portion_qty: number;
+  portion_unit: string;
+  protein_g: number;
+  calories: number;
+  is_mess_item: boolean;
+  mess_serving_definition?: string;
+  note?: string;
+}
+
+export interface PlanOverrides {
+  calorie_target?: number;
+  protein_target_g?: number;
+}
+
+export interface YourPlan {
+  profile: UserProfileInput;
+  diet: DietPlan & {
+    effective_calorie_target: number;
+    effective_protein_target_g: number;
+    overrides?: PlanOverrides | null;
+    protein_plan: ProteinPlanItem[];
+    total_planned_protein_g: number;
+    total_planned_calories: number;
+  };
+  workout: WorkoutSplitPlan;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlanDiffItem {
+  category: 'diet' | 'workout';
+  field: string;
+  label: string;
+  from: string;
+  to: string;
+  reason: string;
+}
+
+export interface TodaysPlannedSession {
+  focus: string | null;
+  is_rest_day: boolean;
+  day_name: string;
+  message: string;
+  suggested_focus: string;
+}
+
+export interface LoggedSet {
+  id: string;
+  workout_id: string;
+  exercise_id: string;
+  set_number: number;
+  weight_kg: number;
+  reps: number;
+  rir?: number;
+  planned_rest_sec: number;
+  actual_rest_sec: number;
+  logged_at: string;
+}
+
+export interface ExerciseSessionState {
+  exercise: ExerciseDefinition;
+  sets: PlannedSet[];
+  logged_sets: LoggedSet[];
+  previous_weight_kg?: number;
+  previous_reps?: number[];
+  warmup_note?: string;
+}
+
+export interface WorkoutSummary {
+  workout_id: string;
+  focus: string;
+  total_volume_kg: number;
+  total_sets: number;
+  completed_duration_min: number;
+  planned_duration_min: number;
+  avg_rest_sec: number;
+  planned_rest_sec: number;
+  pr_count: number;
+  rest_insights: string[];
+  progression_updates: Array<{
+    exercise_id: string;
+    exercise_name: string;
+    previous_weight_kg: number;
+    next_weight_kg: number;
+    reason: string;
+  }>;
+}
+
