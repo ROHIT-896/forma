@@ -112,42 +112,35 @@
 
 ---
 
-## 6. WHERE TO CONTINUE: PHASE 2 INSTRUCTIONS
+### Phase 2: Workout Generator, Active Execution & Adaptation ✅
+- Implemented time-fitting workout generator (20-90m) & energy scaling (1-5).
+- Keyboard-first set logger (`Enter` log set, `Space` skip rest, `⌘Z` undo set).
+- Wall-clock timestamp rest timer immune to macOS App Nap/sleep with live macOS Menu Bar Tray countdown and chime notification.
+- Post-workout summary with PR detection, rest efficiency insights, and double progression.
+- 14 Phase 2 unit tests passing in `tests/phase2.test.ts`.
 
-The next AI must implement **Phase 2** (from Section 11 of the project spec):
-> **Phase 2: Workout generator UI, Active workout screen, Set/Rest tracking, Automatic adaptation (section 7).**
+### Phase 3: Diet Tracking, Your Plan & Onboarding ✅
+- First-launch Onboarding wizard modal (height, weight, age, sex, goal, schedule, equipment, diet type).
+- Indian mess/hostel diet tracker with practical units (rotis, katoris, bowls, pieces, scoops) and Mess Mode toggle.
+- "Repeat yesterday's meal", saved meals CRUD, quick protein chips, water logger with undo, bodyweight upsert.
+- "Your Plan" screen with manual overrides, 14-day flat trend detection, and "Preview Plan Update" modal with diffs.
+- 15 Phase 3 unit tests passing in `tests/phase3.test.ts`.
 
-### What to Build in Phase 2:
-1. **Workout Generator Screen & Today Hub Card:**
-   - Inline interactive chips for **Time Available** (20, 30, 45, 60, 90 min) and **Energy Today** (1 to 5).
-   - Focus picker (Push / Pull / Legs / Upper / Lower / Full Body / Auto-suggest).
-   - "Start Workout" button: Calls `generateWorkoutSession` from `/src/engine/workout.ts`.
-   - Exercise Swap button: Allows swapping an exercise using `getExerciseSubstitutions`.
-   - Live "I'm short on time" re-fit button during or before the session.
-2. **Active Workout Screen (Desktop macOS):**
-   - Renders the session exercise list, order, warm-up note, target rep range, and target RIR.
-   - Shows previous-session weight $\times$ reps inline per exercise.
-   - Per set inputs: `weight_kg`, `reps`, optional 1-tap RIR chips (`0`, `1`, `2`, `3+`).
-   - **Keyboard-first navigation**:
-     - `Enter`: Log set + immediately start rest timer.
-     - `Tab`: Cycle between weight, reps, RIR.
-     - `Cmd + Z`: Undo last set.
-     - `Space`: Skip/cancel active rest timer.
-     - Large, clear click targets.
-3. **Rest Timer & Native macOS Integrations:**
-   - Starts rest countdown automatically upon logging a set.
-   - Computes actual rest using `Date.now() - setLoggedTimestampMs`.
-   - Shows live rest countdown in the macOS Menu Bar Tray via `window.formaAPI.updateTrayTimer`.
-   - Fires native macOS notification and chime when rest ends via `window.formaAPI.notifyRestComplete`.
-   - Engages `window.formaAPI.setPowerSaveBlocker(true)` while the session is active to prevent Mac sleep; releases it upon workout completion.
-   - "Skip/Ignore this rest" button for distractions.
-4. **Session Summary & Post-Workout Adaptation:**
-   - Summary display: Total volume, total sets, planned vs actual duration, average rest vs planned, PR flags.
-   - Rest insights: Flag if user rushed compound rest and suffered rep drop.
-   - Automatic adaptation execution: Applies `calculateNextExerciseProgression` to update `exercise_tracking_state` in SQLite with human-readable reason strings (e.g. `"+2.5 kg: you hit 3x10 last time"`).
-   - Saves completed workout and sets into SQLite tables `workouts` and `workout_sets`.
-5. **Phase 2 Verification & Packaging:**
-   - Write unit tests for set logging and active workout IPC.
-   - Re-run `node ./node_modules/vitest/vitest.mjs run`.
-   - Re-package the app: `node ./node_modules/electron-builder/cli.js --mac dmg --arm64`.
-   - Install to `/Applications/FORMA.app` and test an active workout end-to-end.
+### Phase 4: Progress Analytics, Backup & Settings Polish ✅
+- Streak counter tolerant of rest days (`src/engine/progress.ts`).
+- Epley Estimated 1RM calculator ($W \times (1 + r/30)$) & per-exercise strength progression curves.
+- Weekly muscle volume aggregation (hard sets completed vs weekly target).
+- Gentle weekly review card with highlights and actionable adjustment.
+- Full offline JSON database export & restore round-trip (`src/main/backupRepo.ts`).
+- Settings screen with accent color picker (Emerald, Sky Blue, Violet, Amber, Rose), configurable notification times, automatic launch backups list, and `⌘,` keyboard shortcut.
+- 9 Phase 4 unit tests passing in `tests/phase4.test.ts`.
+
+---
+
+## 5. Verification & Testing Status (100% Passed)
+- Total Unit Tests: **64 / 64 passing** across 5 test suites (`phase0`, `engine`, `phase2`, `phase3`, `phase4`).
+- Type Checking: `tsc --noEmit` passes with **0 errors**.
+- Packaged App: Installed in `/Applications/FORMA.app` (Apple Silicon arm64).
+- App Status: Launched and verified live.
+- Definition of Done (Section 13) fully met.
+
