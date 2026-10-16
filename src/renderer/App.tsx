@@ -71,7 +71,16 @@ export default function App() {
   useEffect(() => {
     initApp();
     checkForActiveSession();
-  }, []);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+        e.preventDefault();
+        setCurrentTab('settings');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [setCurrentTab]);
 
   // Rest timer tick — runs every second while resting, immune to App Nap
   useEffect(() => {

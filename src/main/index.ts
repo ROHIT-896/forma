@@ -6,6 +6,8 @@ import type { AppInfo, DBPingResult } from '../shared/types';
 import * as workoutRepo from './workoutRepo';
 import * as dietRepo from './dietRepo';
 import * as planRepo from './planRepo';
+import * as backupRepo from './backupRepo';
+import * as analyticsRepo from './analyticsRepo';
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -182,6 +184,30 @@ function setupIPCHandlers(dbInfo: { dbPath: string; backupCount: number; schemaV
   ipcMain.handle('diet:logWeight', async (_e, dateStr, weightKg) => dietRepo.logWeight(getDatabase(), dateStr, weightKg));
   ipcMain.handle('diet:getWeightHistory', async (_e, limitDays) => dietRepo.getWeightHistory(getDatabase(), limitDays));
   ipcMain.handle('diet:evaluateWeightTrend', async (_e, goal) => dietRepo.evaluateWeightTrendForGoal(getDatabase(), goal));
+
+  // Phase 4: Analytics
+  ipcMain.handle('analytics:getStreak', async () => analyticsRepo.getWorkoutStreak(getDatabase()));
+  ipcMain.handle('analytics:getWeeklyMuscleVolume', async () => analyticsRepo.getWeeklyMuscleVolumeSummary(getDatabase()));
+  ipcMain.handle('analytics:getWeeklyReview', async () => analyticsRepo.getWeeklyReviewSummary(getDatabase()));
+  ipcMain.handle('analytics:getExercisePRHistory', async (_e, exerciseId: string) => analyticsRepo.getExercisePRHistorySummary(getDatabase(), exerciseId));
+
+  // Phase 4: Data & Backup
+  ipcMain.handle('data:exportJson', async () => {
+    const data = backupRepo.exportAllData(getDatabase());
+    return JSON.stringify(data, null, 2);
+  });
+  ipcMain.handle('data:importJson', async (_e, jsonString: string) => {
+    const payload = JSON.parse(jsonString);
+    return backupRepo.importAllData(getDatabase(), payload);
+  });
+  ipcMain.handle('data:getBackupsList', async () => {
+    const backupsDir = path.join(app.getPath('userData'), 'backups');
+    return backupRepo.listBackups(backupsDir);
+  });
+
+  // Phase 4: Settings & Customization
+  ipcMain.handle('settings:getSettings', async () => analyticsRepo.getAppSettings(getDatabase()));
+  ipcMain.handle('settings:saveSettings', async (_e, settings) => analyticsRepo.saveAppSettings(getDatabase(), settings));
 }
 
 // App lifecycle

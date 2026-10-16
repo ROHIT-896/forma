@@ -49,6 +49,17 @@ const api: FormaAPI = {
   logWeight: (dateStr, weightKg) => ipcRenderer.invoke('diet:logWeight', dateStr, weightKg),
   getWeightHistory: (limitDays) => ipcRenderer.invoke('diet:getWeightHistory', limitDays),
   evaluateWeightTrend: (goal) => ipcRenderer.invoke('diet:evaluateWeightTrend', goal),
+
+  // Phase 4
+  getStreak: () => ipcRenderer.invoke('analytics:getStreak'),
+  getWeeklyMuscleVolume: () => ipcRenderer.invoke('analytics:getWeeklyMuscleVolume'),
+  getWeeklyReview: () => ipcRenderer.invoke('analytics:getWeeklyReview'),
+  getExercisePRHistory: (exerciseId) => ipcRenderer.invoke('analytics:getExercisePRHistory', exerciseId),
+  exportDataJson: () => ipcRenderer.invoke('data:exportJson'),
+  importDataJson: (jsonString) => ipcRenderer.invoke('data:importJson', jsonString),
+  getBackupsList: () => ipcRenderer.invoke('data:getBackupsList'),
+  getSettings: () => ipcRenderer.invoke('settings:getSettings'),
+  saveSettings: (settings) => ipcRenderer.invoke('settings:saveSettings', settings),
 };
 
 // Expose safe, typed API to renderer window

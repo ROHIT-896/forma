@@ -123,6 +123,48 @@ export interface FormaAPI {
   logWeight: (dateStr: string, weightKg: number) => Promise<void>;
   getWeightHistory: (limitDays?: number) => Promise<Array<{ date: string; weight_kg: number }>>;
   evaluateWeightTrend: (goal: Goal) => Promise<any>;
+
+  // Phase 4: Analytics, Backup & Customization
+  getStreak: () => Promise<{ current_streak: number; best_streak: number }>;
+  getWeeklyMuscleVolume: () => Promise<Array<{ muscle: string; completed_sets: number; target_sets: number }>>;
+  getWeeklyReview: () => Promise<{
+    period_label: string;
+    workouts_completed: number;
+    workouts_planned: number;
+    days_hit_protein: number;
+    weight_change_kg: number;
+    highlights: string[];
+    suggested_adjustment: string;
+  }>;
+  getExercisePRHistory: (exerciseId: string) => Promise<{
+    exercise_id: string;
+    exercise_name: string;
+    best_weight_kg: number;
+    best_reps: number;
+    estimated_1rm_kg: number;
+    history: Array<{ date: string; weight_kg: number; reps: number; estimated_1rm_kg: number }>;
+  } | null>;
+  exportDataJson: () => Promise<string>;
+  importDataJson: (jsonString: string) => Promise<{ success: boolean; counts: Record<string, number> }>;
+  getBackupsList: () => Promise<Array<{ fileName: string; sizeBytes: number; createdAt: string }>>;
+  getSettings: () => Promise<{
+    accentColor: string;
+    notifications: {
+      workoutReminder: boolean;
+      workoutTime: string;
+      mealReminder: boolean;
+      mealTime: string;
+    };
+  }>;
+  saveSettings: (settings: {
+    accentColor?: string;
+    notifications?: {
+      workoutReminder: boolean;
+      workoutTime: string;
+      mealReminder: boolean;
+      mealTime: string;
+    };
+  }) => Promise<void>;
 }
 
 declare global {

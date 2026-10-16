@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import {
   Dumbbell, Clock, BarChart2, Scale, TrendingUp, TrendingDown, Minus,
+  Flame, Sparkles, Trophy, ChevronRight, Activity, CheckCircle2,
 } from 'lucide-react';
 import type { WorkoutRow } from '../../main/workoutRepo';
+import type { ExerciseDefinition } from '../../engine/types';
 
 const FOCUS_COLORS: Record<string, string> = {
   Push: 'text-blue-400 bg-blue-500/10 border-blue-500/30',
@@ -56,10 +58,213 @@ function WorkoutCard({ workout }: { workout: WorkoutRow }) {
         </div>
       </div>
       {workout.avg_rest_sec > 0 && (
-        <div className="text-[11px] text-slate-600">
+        <div className="text-[11px] text-slate-500">
           Avg rest: {Math.round(workout.avg_rest_sec)}s
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Streak Banner ─────────────────────────────────────────────────────────────
+function StreakBanner({ current, best }: { current: number; best: number }) {
+  return (
+    <div className="bg-gradient-to-r from-amber-500/10 via-[#1A1D25] to-[#1A1D25] border border-amber-500/20 rounded-2xl p-4 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+          <Flame className="w-6 h-6 animate-pulse" />
+        </div>
+        <div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-white">{current}</span>
+            <span className="text-xs text-amber-400 font-semibold uppercase tracking-wider">
+              Day Streak
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            Planned workout days hit · Rest days protected
+          </p>
+        </div>
+      </div>
+      <div className="text-right">
+        <div className="text-sm font-bold text-slate-300">{best} days</div>
+        <div className="text-[10px] text-slate-500 uppercase tracking-wider">Best Streak</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Gentle Weekly Review Card ──────────────────────────────────────────────────
+function WeeklyReviewCard({
+  review,
+}: {
+  review: {
+    period_label: string;
+    workouts_completed: number;
+    workouts_planned: number;
+    days_hit_protein: number;
+    weight_change_kg: number;
+    highlights: string[];
+    suggested_adjustment: string;
+  };
+}) {
+  return (
+    <div className="bg-[#1A1D25] border border-[#272B36] rounded-xl p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-emerald-400" />
+          <h3 className="text-xs font-semibold text-white uppercase tracking-wider">
+            Weekly Review ({review.period_label})
+          </h3>
+        </div>
+        <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+          {review.workouts_completed}/{review.workouts_planned} sessions
+        </span>
+      </div>
+
+      <div className="space-y-1.5">
+        {review.highlights.map((h, i) => (
+          <div key={i} className="flex items-start gap-2 text-xs text-slate-300">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
+            <span>{h}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-[#14171E] border border-[#272B36] rounded-lg p-3 text-xs text-slate-400 leading-relaxed">
+        <span className="font-semibold text-emerald-400 block mb-0.5">Recommendation:</span>
+        {review.suggested_adjustment}
+      </div>
+    </div>
+  );
+}
+
+// ── Exercise 1RM Tracker ───────────────────────────────────────────────────────
+function ExercisePRTracker({
+  exercises,
+}: {
+  exercises: ExerciseDefinition[];
+}) {
+  const [selectedExId, setSelectedExId] = useState<string>(exercises[0]?.id || 'barbell_bench_press');
+  const [prData, setPrData] = useState<{
+    exercise_name: string;
+    best_weight_kg: number;
+    best_reps: number;
+    estimated_1rm_kg: number;
+    history: Array<{ date: string; weight_kg: number; reps: number; estimated_1rm_kg: number }>;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!selectedExId || !window.formaAPI) return;
+    window.formaAPI.getExercisePRHistory(selectedExId).then(setPrData);
+  }, [selectedExId]);
+
+  return (
+    <div className="bg-[#1A1D25] border border-[#272B36] rounded-xl p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+          <Trophy className="w-3.5 h-3.5 text-amber-400" /> Strength & 1RM Progression
+        </div>
+        <select
+          value={selectedExId}
+          onChange={(e) => setSelectedExId(e.target.value)}
+          className="bg-[#14171E] border border-[#272B36] text-xs text-white rounded-lg px-2.5 py-1.5 outline-none focus:border-emerald-500/50"
+        >
+          {exercises.map((e) => (
+            <option key={e.id} value={e.id}>
+              {e.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {prData && (
+        <>
+          <div className="grid grid-cols-3 gap-2 text-center pt-1">
+            <div className="bg-[#14171E] rounded-lg p-2.5">
+              <div className="text-base font-bold text-white">{prData.best_weight_kg} kg</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Heaviest Load</div>
+            </div>
+            <div className="bg-[#14171E] rounded-lg p-2.5">
+              <div className="text-base font-bold text-white">{prData.best_reps}</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Most Reps</div>
+            </div>
+            <div className="bg-[#14171E] rounded-lg p-2.5">
+              <div className="text-base font-bold text-amber-400">{prData.estimated_1rm_kg} kg</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Est. 1RM (Epley)</div>
+            </div>
+          </div>
+
+          {prData.history.length >= 2 ? (
+            <div className="pt-2">
+              <div className="text-[11px] text-slate-500 mb-1">1RM History Trend:</div>
+              <div className="flex items-end gap-1.5 h-14 bg-[#14171E] rounded-lg p-2">
+                {prData.history.slice(-10).map((h, i) => {
+                  const max = Math.max(...prData.history.map((x) => x.estimated_1rm_kg), 1);
+                  const hPct = Math.max(15, (h.estimated_1rm_kg / max) * 100);
+                  return (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
+                      <div
+                        className="w-full bg-amber-500/30 group-hover:bg-amber-400 rounded-sm transition"
+                        style={{ height: `${hPct}%` }}
+                      />
+                      <span className="text-[9px] text-slate-500">{h.estimated_1rm_kg}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-2 text-slate-600 text-xs">
+              Log sets across multiple sessions to see your strength curve.
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Weekly Muscle Volume Bars ──────────────────────────────────────────────────
+function MuscleVolumeSection({
+  volumes,
+}: {
+  volumes: Array<{ muscle: string; completed_sets: number; target_sets: number }>;
+}) {
+  if (volumes.length === 0) return null;
+
+  return (
+    <div className="bg-[#1A1D25] border border-[#272B36] rounded-xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+          <Activity className="w-3.5 h-3.5 text-blue-400" /> Weekly Sets Per Muscle Group
+        </h3>
+        <span className="text-[11px] text-slate-500">Target hard sets/wk</span>
+      </div>
+      <div className="space-y-2">
+        {volumes.map((v) => {
+          const pct = Math.min(100, Math.round((v.completed_sets / Math.max(v.target_sets, 1)) * 100));
+          const isComplete = v.completed_sets >= v.target_sets;
+          return (
+            <div key={v.muscle} className="space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-300 capitalize font-medium">{v.muscle}</span>
+                <span className={isComplete ? 'text-emerald-400 font-bold' : 'text-slate-400'}>
+                  {v.completed_sets} / {v.target_sets} sets ({pct}%)
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-[#14171E] rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    isComplete ? 'bg-emerald-400' : 'bg-blue-500'
+                  }`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -118,7 +323,6 @@ function WeightChart({ data }: { data: Array<{ date: string; weight_kg: number }
           const y = H - ((d.weight_kg - min) / (max - min)) * H;
           return <circle key={i} cx={x} cy={y} r="3" fill="#10b981" />;
         })}
-        {/* First & last labels */}
         <text x="4" y={H - ((first.weight_kg - min) / (max - min)) * H - 8}
           fill="#6b7280" fontSize="10">{first.weight_kg}kg</text>
         <text x={W - 4} y={H - ((last.weight_kg - min) / (max - min)) * H - 8}
@@ -178,18 +382,35 @@ function VolumeChart({ workouts }: { workouts: WorkoutRow[] }) {
 export default function ProgressScreen() {
   const [workouts, setWorkouts] = useState<WorkoutRow[]>([]);
   const [weightHistory, setWeightHistory] = useState<Array<{ date: string; weight_kg: number }>>([]);
+  const [exercises, setExercises] = useState<ExerciseDefinition[]>([]);
+  const [streak, setStreak] = useState<{ current_streak: number; best_streak: number }>({ current_streak: 0, best_streak: 0 });
+  const [weeklyReview, setWeeklyReview] = useState<any | null>(null);
+  const [volumes, setVolumes] = useState<Array<{ muscle: string; completed_sets: number; target_sets: number }>>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       if (!window.formaAPI) return;
-      const [ws, wh] = await Promise.all([
-        window.formaAPI.getRecentWorkouts(30),
-        window.formaAPI.getWeightHistory(60),
-      ]);
-      setWorkouts(ws);
-      setWeightHistory(wh);
-      setLoading(false);
+      try {
+        const [ws, wh, ex, strk, review, vol] = await Promise.all([
+          window.formaAPI.getRecentWorkouts(30),
+          window.formaAPI.getWeightHistory(60),
+          window.formaAPI.listExercises(),
+          window.formaAPI.getStreak(),
+          window.formaAPI.getWeeklyReview(),
+          window.formaAPI.getWeeklyMuscleVolume(),
+        ]);
+        setWorkouts(ws);
+        setWeightHistory(wh);
+        setExercises(ex);
+        setStreak(strk);
+        setWeeklyReview(review);
+        setVolumes(vol);
+      } catch (err) {
+        console.error('Failed to load progress data:', err);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
 
@@ -197,12 +418,20 @@ export default function ProgressScreen() {
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-5 space-y-4 max-w-2xl mx-auto">
-      <h2 className="text-lg font-bold text-white">Progress</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-bold text-white">Progress & Analytics</h2>
+      </div>
 
       {loading ? (
-        <div className="text-center py-12 text-slate-500 text-sm">Loading history…</div>
+        <div className="text-center py-12 text-slate-500 text-sm">Loading analytics…</div>
       ) : (
         <>
+          {/* Streak Banner */}
+          <StreakBanner current={streak.current_streak} best={streak.best_streak} />
+
+          {/* Gentle Weekly Review */}
+          {weeklyReview && <WeeklyReviewCard review={weeklyReview} />}
+
           {/* Summary Stats */}
           {completed.length > 0 && (
             <div className="grid grid-cols-3 gap-3">
@@ -228,6 +457,12 @@ export default function ProgressScreen() {
               ))}
             </div>
           )}
+
+          {/* Strength & 1RM Progression Tracker */}
+          {exercises.length > 0 && <ExercisePRTracker exercises={exercises} />}
+
+          {/* Weekly Sets Per Muscle Group */}
+          <MuscleVolumeSection volumes={volumes} />
 
           {/* Volume Chart */}
           <VolumeChart workouts={completed} />
