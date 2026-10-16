@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Search, Plus, X, Repeat2, ChevronDown, ChevronUp,
   Droplets, DropletIcon, Scale, Check, Trash2, BookmarkCheck,
+  Utensils, Sparkles, Flame,
 } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
-import type { FoodDefinition, MealType } from '../../engine/types';
+import type { FoodDefinition, MealType, DietaryType } from '../../engine/types';
 import type { FoodLogRow } from '../../main/dietRepo';
 
 const MEAL_LABELS: Record<MealType, string> = {
@@ -65,17 +66,30 @@ function Ring({
 function AddFoodModal({
   onClose,
   defaultMealType,
+  initialTab = 'catalog',
 }: {
   onClose: () => void;
   defaultMealType: MealType;
+  initialTab?: 'catalog' | 'custom';
 }) {
-  const { todayDiet, refreshTodayDiet } = useAppStore();
+  const { refreshTodayDiet, selectedDate } = useAppStore();
+  const [tab, setTab] = useState<'catalog' | 'custom'>(initialTab);
   const [foods, setFoods] = useState<FoodDefinition[]>([]);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<FoodDefinition | null>(null);
   const [mealType, setMealType] = useState<MealType>(defaultMealType);
   const [qty, setQty] = useState(1);
   const [adding, setAdding] = useState(false);
+
+  // Custom / Outside Food State
+  const [customName, setCustomName] = useState('');
+  const [customQty, setCustomQty] = useState<number>(1);
+  const [customUnit, setCustomUnit] = useState('serving');
+  const [customCals, setCustomCals] = useState<number>(350);
+  const [customProtein, setCustomProtein] = useState<number>(18);
+  const [customDietary, setCustomDietary] = useState<DietaryType>('non_veg');
+  const [saveToLibrary, setSaveToLibrary] = useState(true);
+
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -85,15 +99,15 @@ function AddFoodModal({
 
   const filtered = foods.filter((f) =>
     f.name.toLowerCase().includes(query.toLowerCase())
-  ).slice(0, 30);
+  ).slice(0, 35);
 
-  const handleAdd = async () => {
+  const handleAddCatalog = async () => {
     if (!selected || !window.formaAPI) return;
     setAdding(true);
-    const today = new Date().toISOString().slice(0, 10);
+    const dateStr = selectedDate || new Date().toISOString().slice(0, 10);
     try {
       await window.formaAPI.logFood({
-        date: today,
+        date: dateStr,
         meal_type: mealType,
         food_id: selected.id,
         portion_quantity: qty,
@@ -107,91 +121,386 @@ function AddFoodModal({
     }
   };
 
+  const handleAddCustom = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customName.trim() || !window.formaAPI) return;
+    setAdding(true);
+    const dateStr = selectedDate || new Date().toISOString().slice(0, 10);
+    const safeQty = Math.max(0.1, Number(customQty) || 1);
+    const safeCals = Math.max(0, Number(customCals) || 0);
+    const safePro = Math.max(0, Number(customProtein) || 0);
+
+    try {
+      // Upsert into foods so it's queryable and logged with full nutrition
+      const newFood = await window.formaAPI.upsertFood({
+        name: customName.trim(),
+        category: 'Outside / Custom',
+        dietary_type: customDietary,
+        default_portion_unit: customUnit,
+        portion_description: `${safeQty} ${customUnit}`,
+        estimated_calories: safeCals / safeQty,
+        estimated_protein: safePro / safeQty,
+        is_mess_item: false,
+        assumption_note: 'User-entered outside/custom meal.',
+      });
+
+      // Log this food entry
+      await window.formaAPI.logFood({
+        date: dateStr,
+        meal_type: mealType,
+        food_id: newFood.id,
+        portion_quantity: safeQty,
+        portion_unit: customUnit,
+      });
+
+      await refreshTodayDiet();
+      onClose();
+    } catch (err) {
+      console.error('Failed to log outside food:', err);
+      alert('Failed to log custom meal. Please check inputs.');
+    } finally {
+      setAdding(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg bg-[#14171E] border-t border-[#272B36] rounded-t-2xl p-5 space-y-4 max-h-[80vh] flex flex-col"
+        className="w-full max-w-lg bg-[#14171E] border border-[#272B36] rounded-2xl p-5 space-y-4 max-h-[88vh] flex flex-col shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between">
-          <h3 className="font-bold text-white">Add Food</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition cursor-pointer">
+        {/* Header with Mode Tabs */}
+        <div className="flex items-center justify-between border-b border-[#272B36] pb-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setTab('catalog')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                tab === 'catalog'
+                  ? 'bg-[var(--accent-primary)] text-white shadow-sm'
+                  : 'bg-[#1A1D25] text-slate-400 hover:text-white border border-[#272B36]'
+              }`}
+            >
+              Mess & Catalog Foods
+            </button>
+            <button
+              onClick={() => setTab('custom')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                tab === 'custom'
+                  ? 'bg-[var(--accent-primary)] text-white shadow-sm'
+                  : 'bg-[#1A1D25] text-slate-400 hover:text-white border border-[#272B36]'
+              }`}
+            >
+              <Utensils className="w-3.5 h-3.5" /> Outside / Custom Meal
+            </button>
+          </div>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-white transition cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Meal Type Picker */}
-        <div className="flex gap-2 flex-wrap">
-          {MEAL_ORDER.map((mt) => (
-            <button
-              key={mt}
-              onClick={() => setMealType(mt)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition cursor-pointer
-                ${mealType === mt
-                  ? 'bg-emerald-500 text-black'
-                  : 'bg-[#272B36] text-slate-400 hover:bg-[#31363F]'}`}
-            >
-              {MEAL_LABELS[mt]}
-            </button>
-          ))}
-        </div>
-
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search foods…"
-            className="w-full pl-9 pr-4 py-2.5 bg-[#1A1D25] border border-[#272B36] rounded-xl text-sm text-white placeholder-slate-600 outline-none focus:border-emerald-500/50 transition"
-          />
-        </div>
-
-        {/* Food List */}
-        <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
-          {filtered.length === 0 && (
-            <div className="text-center py-8 text-slate-500 text-sm">No foods found</div>
-          )}
-          {filtered.map((food) => (
-            <button
-              key={food.id}
-              onClick={() => setSelected(food === selected ? null : food)}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition cursor-pointer
-                ${selected?.id === food.id
-                  ? 'bg-emerald-500/15 border border-emerald-500/30'
-                  : 'hover:bg-[#1F222B] border border-transparent'}`}
-            >
-              <div className="min-w-0">
-                <div className="text-sm font-medium text-white truncate">{food.name}</div>
-                <div className="text-[11px] text-slate-500">
-                  {food.portion_description} · {food.estimated_calories} kcal · {food.estimated_protein}g protein
-                </div>
-              </div>
-              {selected?.id === food.id && <Check className="w-4 h-4 text-emerald-400 flex-shrink-0 ml-2" />}
-            </button>
-          ))}
-        </div>
-
-        {/* Quantity + Add */}
-        {selected && (
-          <div className="flex items-center gap-3 pt-2 border-t border-[#272B36]">
-            <div className="flex items-center gap-2 bg-[#1A1D25] border border-[#272B36] rounded-xl px-3 py-2">
-              <button onClick={() => setQty(Math.max(0.5, qty - 0.5))} className="text-slate-400 hover:text-white cursor-pointer">−</button>
-              <span className="text-sm font-medium text-white w-8 text-center">{qty}</span>
-              <button onClick={() => setQty(qty + 0.5)} className="text-slate-400 hover:text-white cursor-pointer">+</button>
-            </div>
-            <span className="text-xs text-slate-400 flex-1 truncate">
-              {selected.portion_description} × {qty} = ~{Math.round(selected.estimated_calories * qty)} kcal
-            </span>
-            <button
-              onClick={handleAdd}
-              disabled={adding}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-black font-bold text-sm transition cursor-pointer disabled:opacity-60"
-            >
-              {adding ? '…' : <><Plus className="w-4 h-4" /> Add</>}
-            </button>
+        {/* Meal Slot Picker (applies to both modes) */}
+        <div>
+          <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">
+            Log to Meal Slot
+          </label>
+          <div className="flex gap-2 flex-wrap">
+            {MEAL_ORDER.map((mt) => (
+              <button
+                key={mt}
+                type="button"
+                onClick={() => setMealType(mt)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition cursor-pointer
+                  ${mealType === mt
+                    ? 'bg-[var(--accent-primary)] text-white'
+                    : 'bg-[#1A1D25] border border-[#272B36] text-slate-400 hover:bg-[#272B36]'}`}
+              >
+                {MEAL_LABELS[mt]}
+              </button>
+            ))}
           </div>
+        </div>
+
+        {tab === 'catalog' ? (
+          <>
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                ref={inputRef}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search 130+ mess foods & saved items…"
+                className="w-full pl-9 pr-4 py-2 bg-[#1A1D25] border border-[#272B36] rounded-xl text-xs text-white placeholder-slate-600 outline-none focus:border-[var(--accent-primary)] transition"
+              />
+            </div>
+
+            {/* Food List */}
+            <div className="flex-1 overflow-y-auto space-y-1 min-h-[200px] max-h-[300px]">
+              {filtered.length === 0 ? (
+                <div className="text-center py-6 px-4 space-y-3">
+                  <div className="text-xs text-slate-500">No matching food found in mess catalog.</div>
+                  <button
+                    onClick={() => {
+                      setCustomName(query);
+                      setTab('custom');
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--accent-bg)] border border-[var(--accent-border)] text-xs text-[var(--accent-primary)] font-semibold transition hover:opacity-90 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Log &ldquo;{query || 'Outside Meal'}&rdquo; as Custom Food
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {filtered.map((food) => (
+                    <button
+                      key={food.id}
+                      onClick={() => setSelected(food === selected ? null : food)}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition cursor-pointer
+                        ${selected?.id === food.id
+                          ? 'bg-[var(--accent-bg)] border border-[var(--accent-border)]'
+                          : 'hover:bg-[#1F222B] border border-transparent'}`}
+                    >
+                      <div className="min-w-0 pr-2">
+                        <div className="text-xs font-semibold text-white truncate flex items-center gap-1.5">
+                          {food.name}
+                          {food.is_mess_item && (
+                            <span className="text-[9px] px-1 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                              Mess
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          {food.portion_description} · {food.estimated_calories} kcal · {food.estimated_protein}g protein
+                        </div>
+                      </div>
+                      {selected?.id === food.id && <Check className="w-4 h-4 text-[var(--accent-primary)] flex-shrink-0 ml-2" />}
+                    </button>
+                  ))}
+
+                  {/* Option to type custom at bottom of search list */}
+                  <div className="pt-2 text-center">
+                    <button
+                      onClick={() => {
+                        setCustomName(query);
+                        setTab('custom');
+                      }}
+                      className="text-[11px] text-slate-400 hover:text-[var(--accent-primary)] transition cursor-pointer flex items-center justify-center gap-1 mx-auto py-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Can&apos;t find it? Type outside meal with custom grams & macros
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Quantity + Add */}
+            {selected && (
+              <div className="flex items-center gap-3 pt-3 border-t border-[#272B36]">
+                <div className="flex items-center gap-2 bg-[#1A1D25] border border-[#272B36] rounded-xl px-2.5 py-1.5">
+                  <button onClick={() => setQty(Math.max(0.5, qty - 0.5))} className="text-slate-400 hover:text-white cursor-pointer px-1">−</button>
+                  <span className="text-xs font-medium text-white w-6 text-center">{qty}</span>
+                  <button onClick={() => setQty(qty + 0.5)} className="text-slate-400 hover:text-white cursor-pointer px-1">+</button>
+                </div>
+                <span className="text-xs text-slate-400 flex-1 truncate">
+                  {selected.portion_description} × {qty} = ~{Math.round(selected.estimated_calories * qty)} kcal ({Math.round(selected.estimated_protein * qty)}g pro)
+                </span>
+                <button
+                  onClick={handleAddCatalog}
+                  disabled={adding}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:opacity-90 active:scale-95 text-white font-bold text-xs transition cursor-pointer disabled:opacity-60 shadow-sm"
+                >
+                  {adding ? '…' : <><Plus className="w-4 h-4" /> Add Food</>}
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          /* Custom / Outside Food Form */
+          <form onSubmit={handleAddCustom} className="space-y-3.5 overflow-y-auto pr-1">
+            <div>
+              <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
+                Meal / Food Name
+              </label>
+              <input
+                type="text"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                placeholder="e.g., Chicken Shawarma, Zomato Biryani, Pizza, Subway"
+                className="w-full px-3 py-2 bg-[#1A1D25] border border-[#272B36] rounded-xl text-xs text-white placeholder-slate-600 outline-none focus:border-[var(--accent-primary)]"
+                required
+                autoFocus
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
+                  Portion Quantity
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0.1"
+                  value={customQty}
+                  onChange={(e) => setCustomQty(Number(e.target.value))}
+                  className="w-full px-3 py-2 bg-[#1A1D25] border border-[#272B36] rounded-xl text-xs text-white outline-none focus:border-[var(--accent-primary)]"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
+                  Portion Unit
+                </label>
+                <select
+                  value={customUnit}
+                  onChange={(e) => setCustomUnit(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#1A1D25] border border-[#272B36] rounded-xl text-xs text-white outline-none focus:border-[var(--accent-primary)]"
+                >
+                  <option value="grams (g)">grams (g)</option>
+                  <option value="serving">serving</option>
+                  <option value="plate">plate</option>
+                  <option value="piece">piece</option>
+                  <option value="bowl">bowl</option>
+                  <option value="ml">ml</option>
+                  <option value="slice">slice</option>
+                  <option value="roll">roll</option>
+                  <option value="scoop">scoop</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
+                  Calories (kcal)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={customCals}
+                  onChange={(e) => setCustomCals(Number(e.target.value))}
+                  className="w-full px-3 py-2 bg-[#1A1D25] border border-[#272B36] rounded-xl text-xs text-white outline-none focus:border-[var(--accent-primary)]"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
+                  Protein (grams)
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  value={customProtein}
+                  onChange={(e) => setCustomProtein(Number(e.target.value))}
+                  className="w-full px-3 py-2 bg-[#1A1D25] border border-[#272B36] rounded-xl text-xs text-white outline-none focus:border-[var(--accent-primary)]"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Quick Presets */}
+            <div>
+              <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-[var(--accent-primary)]" /> Quick Realistic Presets
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomCals(420);
+                    setCustomProtein(28);
+                    setCustomDietary('non_veg');
+                  }}
+                  className="text-left px-2.5 py-1.5 rounded-lg bg-[#1A1D25] hover:bg-[#222631] border border-[#272B36] text-slate-300"
+                >
+                  🍗 High Protein Meal <span className="text-[10px] text-slate-500 block">420 kcal · 28g pro</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomCals(580);
+                    setCustomProtein(18);
+                    setCustomDietary('veg');
+                  }}
+                  className="text-left px-2.5 py-1.5 rounded-lg bg-[#1A1D25] hover:bg-[#222631] border border-[#272B36] text-slate-300"
+                >
+                  🍕 Fast Food / Cheat <span className="text-[10px] text-slate-500 block">580 kcal · 18g pro</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomCals(220);
+                    setCustomProtein(8);
+                    setCustomDietary('veg');
+                  }}
+                  className="text-left px-2.5 py-1.5 rounded-lg bg-[#1A1D25] hover:bg-[#222631] border border-[#272B36] text-slate-300"
+                >
+                  🥪 Light Snack / Roll <span className="text-[10px] text-slate-500 block">220 kcal · 8g pro</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomCals(180);
+                    setCustomProtein(25);
+                    setCustomDietary('veg');
+                  }}
+                  className="text-left px-2.5 py-1.5 rounded-lg bg-[#1A1D25] hover:bg-[#222631] border border-[#272B36] text-slate-300"
+                >
+                  🥤 Shake / Protein Drink <span className="text-[10px] text-slate-500 block">180 kcal · 25g pro</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Dietary Type */}
+            <div>
+              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                Dietary Type
+              </label>
+              <div className="flex gap-2">
+                {[
+                  { id: 'veg' as DietaryType, label: 'Vegetarian' },
+                  { id: 'egg' as DietaryType, label: 'Egg' },
+                  { id: 'non_veg' as DietaryType, label: 'Non-Veg' },
+                ].map((d) => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => setCustomDietary(d.id)}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition cursor-pointer ${
+                      customDietary === d.id
+                        ? 'border-[var(--accent-primary)] bg-[var(--accent-bg)] text-white'
+                        : 'border-[#272B36] bg-[#1A1D25] text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-[#272B36] flex items-center justify-between">
+              <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={saveToLibrary}
+                  onChange={(e) => setSaveToLibrary(e.target.checked)}
+                  className="rounded accent-[var(--accent-primary)]"
+                />
+                Save to My Foods list
+              </label>
+
+              <button
+                type="submit"
+                disabled={adding || !customName.trim()}
+                className="flex items-center gap-2 px-5 py-2 rounded-xl bg-[var(--accent-primary)] hover:opacity-90 active:scale-95 text-white font-bold text-xs transition cursor-pointer disabled:opacity-60 shadow-sm"
+              >
+                {adding ? 'Logging…' : <><Plus className="w-4 h-4" /> Log Outside Meal</>}
+              </button>
+            </div>
+          </form>
         )}
       </div>
     </div>
@@ -203,12 +512,14 @@ function MealSection({
   mealType,
   items,
   onAddFood,
+  onAddCustomFood,
   onRepeatYesterday,
   onDelete,
 }: {
   mealType: MealType;
   items: FoodLogRow[];
   onAddFood: (meal: MealType) => void;
+  onAddCustomFood: (meal: MealType) => void;
   onRepeatYesterday: (meal: MealType) => void;
   onDelete: (id: string) => void;
 }) {
@@ -237,8 +548,16 @@ function MealSection({
             <Repeat2 className="w-4 h-4" />
           </button>
           <button
+            onClick={(e) => { e.stopPropagation(); onAddCustomFood(mealType); }}
+            className="p-1 rounded hover:text-amber-400 transition cursor-pointer"
+            title="Log outside / custom food"
+          >
+            <Utensils className="w-3.5 h-3.5" />
+          </button>
+          <button
             onClick={(e) => { e.stopPropagation(); onAddFood(mealType); }}
             className="p-1 rounded hover:text-emerald-400 transition cursor-pointer"
+            title="Add from mess food catalog"
           >
             <Plus className="w-4 h-4" />
           </button>
@@ -249,33 +568,68 @@ function MealSection({
       {expanded && (
         <div className="border-t border-[#272B36]">
           {items.length === 0 ? (
-            <button
-              onClick={() => onAddFood(mealType)}
-              className="w-full py-4 text-center text-sm text-slate-600 hover:text-slate-400 transition cursor-pointer"
-            >
-              + Add food
-            </button>
+            <div className="flex divide-x divide-[#272B36]">
+              <button
+                onClick={() => onAddFood(mealType)}
+                className="flex-1 py-3.5 text-center text-xs text-slate-500 hover:text-emerald-400 transition cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" /> Mess Catalog
+              </button>
+              <button
+                onClick={() => onAddCustomFood(mealType)}
+                className="flex-1 py-3.5 text-center text-xs text-slate-500 hover:text-amber-400 transition cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Utensils className="w-3.5 h-3.5" /> Outside / Custom
+              </button>
+            </div>
           ) : (
-            <div className="divide-y divide-[#272B36]">
-              {items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between px-4 py-2.5">
-                  <div className="min-w-0">
-                    <div className="text-sm text-white truncate">{item.food_name}</div>
-                    <div className="text-[11px] text-slate-500">
-                      {item.portion_quantity} {item.portion_unit} · {Math.round(item.calories)} kcal · {Math.round(item.protein)}g
+            <div>
+              <div className="divide-y divide-[#272B36]">
+                {items.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between px-4 py-2.5">
+                    <div className="min-w-0 pr-2">
+                      <div className="text-sm text-white truncate flex items-center gap-1.5">
+                        {item.food_name}
+                        {item.is_mess_item ? (
+                          <span className="text-[9px] px-1 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                            Mess
+                          </span>
+                        ) : (
+                          <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            Outside
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        {item.portion_quantity} {item.portion_unit} · {Math.round(item.calories)} kcal · {Math.round(item.protein)}g
+                      </div>
+                      {item.assumption_note && (
+                        <div className="text-[10px] text-amber-600/80 mt-0.5">{item.assumption_note}</div>
+                      )}
                     </div>
-                    {item.assumption_note && (
-                      <div className="text-[10px] text-amber-600/80 mt-0.5">{item.assumption_note}</div>
-                    )}
+                    <button
+                      onClick={() => onDelete(item.id)}
+                      className="ml-3 p-1 text-slate-600 hover:text-red-400 transition cursor-pointer flex-shrink-0"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => onDelete(item.id)}
-                    className="ml-3 p-1 text-slate-600 hover:text-red-400 transition cursor-pointer flex-shrink-0"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
+                ))}
+              </div>
+              <div className="flex divide-x divide-[#272B36] border-t border-[#272B36] bg-[#14171E]/30">
+                <button
+                  onClick={() => onAddFood(mealType)}
+                  className="flex-1 py-2 text-center text-[11px] text-slate-500 hover:text-white transition cursor-pointer flex items-center justify-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> Add Mess Food
+                </button>
+                <button
+                  onClick={() => onAddCustomFood(mealType)}
+                  className="flex-1 py-2 text-center text-[11px] text-slate-500 hover:text-white transition cursor-pointer flex items-center justify-center gap-1"
+                >
+                  <Utensils className="w-3 h-3" /> Log Outside Meal
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -335,7 +689,7 @@ function WeightSparkline({ data }: { data: Array<{ date: string; weight_kg: numb
 // ─── Main FoodScreen ────────────────────────────────────────────────────────────
 export default function FoodScreen() {
   const { plan, todayDiet, messMode, refreshTodayDiet, toggleMessMode, logQuickProtein } = useAppStore();
-  const [addFoodMeal, setAddFoodMeal] = useState<MealType | null>(null);
+  const [addFoodModal, setAddFoodModal] = useState<{ meal: MealType; tab: 'catalog' | 'custom' } | null>(null);
   const [weightHistory, setWeightHistory] = useState<Array<{ date: string; weight_kg: number }>>([]);
   const [weightInput, setWeightInput] = useState('');
   const [loggingWeight, setLoggingWeight] = useState(false);
@@ -484,7 +838,8 @@ export default function FoodScreen() {
             key={mt}
             mealType={mt}
             items={byMeal[mt]}
-            onAddFood={(meal) => setAddFoodMeal(meal)}
+            onAddFood={(meal) => setAddFoodModal({ meal, tab: 'catalog' })}
+            onAddCustomFood={(meal) => setAddFoodModal({ meal, tab: 'custom' })}
             onRepeatYesterday={handleRepeatYesterday}
             onDelete={handleDeleteLog}
           />
@@ -522,10 +877,11 @@ export default function FoodScreen() {
       </div>
 
       {/* Add Food Modal */}
-      {addFoodMeal && (
+      {addFoodModal && (
         <AddFoodModal
-          defaultMealType={addFoodMeal}
-          onClose={() => setAddFoodMeal(null)}
+          defaultMealType={addFoodModal.meal}
+          initialTab={addFoodModal.tab}
+          onClose={() => setAddFoodModal(null)}
         />
       )}
     </div>

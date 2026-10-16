@@ -42,12 +42,14 @@ export interface ExerciseDefinition {
   substitution_ids: string[];
 }
 
+export type PortionUnit = 'roti' | 'katori' | 'bowl' | 'piece' | 'glass' | 'spoon' | 'scoop' | 'serving' | 'plate' | 'slice' | 'grams' | 'ml' | (string & {});
+
 export interface FoodDefinition {
   id: string;
   name: string;
   category: string;
   dietary_type: DietaryType;
-  default_portion_unit: 'roti' | 'katori' | 'bowl' | 'piece' | 'glass' | 'spoon' | 'scoop';
+  default_portion_unit: PortionUnit;
   portion_description: string;
   estimated_calories: number;
   estimated_protein: number;

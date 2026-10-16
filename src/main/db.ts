@@ -44,37 +44,33 @@ function seedInitialData(db: Database.Database): void {
       console.log(`Seeded ${defaultExercises.length} default exercises.`);
     }
 
-    const foodCountRow = db.prepare('SELECT COUNT(*) as cnt FROM foods').get() as { cnt: number } | undefined;
-    if ((foodCountRow?.cnt ?? 0) === 0) {
-      const insertFood = db.prepare(`
-        INSERT INTO foods (
-          id, name, category, dietary_type, default_portion_unit, portion_description,
-          estimated_calories, estimated_protein, is_mess_item, mess_serving_definition,
-          assumption_note, quick_protein_chip, is_custom
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
-      `);
+    const insertFood = db.prepare(`
+      INSERT OR IGNORE INTO foods (
+        id, name, category, dietary_type, default_portion_unit, portion_description,
+        estimated_calories, estimated_protein, is_mess_item, mess_serving_definition,
+        assumption_note, quick_protein_chip, is_custom
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+    `);
 
-      const insertManyFoods = db.transaction((list: any[]) => {
-        for (const f of list) {
-          insertFood.run(
-            f.id,
-            f.name,
-            f.category,
-            f.dietary_type,
-            f.default_portion_unit,
-            f.portion_description,
-            f.estimated_calories,
-            f.estimated_protein,
-            f.is_mess_item ? 1 : 0,
-            f.mess_serving_definition,
-            f.assumption_note,
-            f.quick_protein_chip ? 1 : 0
-          );
-        }
-      });
-      insertManyFoods(defaultFoods);
-      console.log(`Seeded ${defaultFoods.length} default foods.`);
-    }
+    const insertManyFoods = db.transaction((list: any[]) => {
+      for (const f of list) {
+        insertFood.run(
+          f.id,
+          f.name,
+          f.category,
+          f.dietary_type,
+          f.default_portion_unit,
+          f.portion_description,
+          f.estimated_calories,
+          f.estimated_protein,
+          f.is_mess_item ? 1 : 0,
+          f.mess_serving_definition,
+          f.assumption_note,
+          f.quick_protein_chip ? 1 : 0
+        );
+      }
+    });
+    insertManyFoods(defaultFoods);
   } catch (error) {
     console.error('Error seeding initial data:', error);
   }

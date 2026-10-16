@@ -36,8 +36,8 @@ const VALID_MUSCLES = new Set([
 ]);
 
 const VALID_EQUIPMENT = new Set(['barbell', 'dumbbell', 'cable', 'machine', 'bodyweight']);
-const VALID_DIETARY_TYPES = new Set(['veg', 'non-veg', 'eggetarian']);
-const VALID_UNITS = new Set(['roti', 'katori', 'bowl', 'piece', 'glass', 'spoon', 'scoop']);
+const VALID_DIETARY_TYPES = new Set(['veg', 'non-veg', 'eggetarian', 'non_veg', 'egg']);
+const VALID_UNITS = new Set(['roti', 'katori', 'bowl', 'piece', 'glass', 'spoon', 'scoop', 'plate', 'serving', 'cup', 'slice', 'grams', 'ml']);
 
 export function validateSeedData(baseDir = __dirname): { valid: boolean; errors: string[] } {
   const errors: string[] = [];

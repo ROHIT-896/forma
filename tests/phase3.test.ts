@@ -29,6 +29,7 @@ import {
   undoLastWater,
   logWeight,
   getWeightHistory,
+  upsertFood,
 } from '../src/main/dietRepo';
 import {
   generateYourPlan,
@@ -334,5 +335,48 @@ describe('Phase 3: Diet Logging, Your Plan, Onboarding & Adaptation', () => {
 
     setMessMode(db, true);
     expect(getMessMode(db)).toBe(true);
+  });
+
+  it('supports logging unexpected/outside meals with custom properties and nutrition', () => {
+    // 1. Create a custom outside food (e.g. Swiggy Chicken Shawarma)
+    const shawarma = upsertFood(db, {
+      name: 'Chicken Shawarma Roll (Outside)',
+      category: 'Outside / Custom',
+      dietary_type: 'non-veg',
+      default_portion_unit: 'serving',
+      portion_description: '1 standard roll',
+      estimated_calories: 420,
+      estimated_protein: 26,
+      is_mess_item: false,
+      assumption_note: 'Ordered from outside restaurant',
+    });
+
+    expect(shawarma.id).toMatch(/^custom_/);
+    expect(shawarma.is_mess_item).toBe(false);
+
+    // 2. Log 1.5 portions for dinner
+    const logged = logFood(db, {
+      date: '2026-10-16',
+      meal_type: 'dinner',
+      food_id: shawarma.id,
+      portion_quantity: 1.5,
+      portion_unit: 'serving',
+    });
+
+    expect(logged.calories).toBe(630); // 420 * 1.5
+    expect(logged.protein).toBe(39); // 26 * 1.5
+
+    // 3. Check day diet totals includes the outside meal
+    const day = getDayDiet(db, '2026-10-16');
+    expect(day.totals.calories).toBe(630);
+    expect(day.totals.protein).toBe(39);
+    expect(day.logs.length).toBe(1);
+    expect(day.logs[0].food_name).toBe('Chicken Shawarma Roll (Outside)');
+    expect(day.logs[0].is_mess_item).toBe(false);
+
+    // 4. Verify custom food appears in food listing
+    const allFoods = listFoods(db);
+    const found = allFoods.find((f) => f.name === 'Chicken Shawarma Roll (Outside)');
+    expect(found).toBeDefined();
   });
 });
