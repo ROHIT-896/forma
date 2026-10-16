@@ -14,6 +14,8 @@ import {
   AlertCircle,
   Flag,
   Coffee,
+  X,
+  ChevronLeft,
 } from 'lucide-react';
 
 export default function ActiveWorkoutScreen() {
@@ -38,6 +40,7 @@ export default function ActiveWorkoutScreen() {
     updateRestTick,
     swapExercise,
     finishCurrentWorkout,
+    cancelCurrentWorkout,
     startWorkout,
   } = useWorkoutStore();
 
@@ -124,10 +127,25 @@ export default function ActiveWorkoutScreen() {
     }
   };
 
+  const handleDiscard = async () => {
+    const hasLoggedSets = exerciseStates.some((es) => es.logged_sets.length > 0);
+    if (hasLoggedSets) {
+      if (!window.confirm('Discard this workout session and all logged sets?')) {
+        return;
+      }
+    }
+    await cancelCurrentWorkout();
+    setCurrentTab('today');
+  };
+
+  const handlePause = () => {
+    setCurrentTab('today');
+  };
+
   const substitutions = getExerciseSubstitutions(currentEx, allExercises);
 
   return (
-    <div className="max-w-5xl mx-auto w-full space-y-6 pb-12 select-none">
+    <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 max-w-5xl mx-auto w-full pb-28 select-none">
       {/* Top Banner: Workout Info & Finish Button */}
       <div className="flex items-center justify-between bg-[#181B22] border border-[#272B36] rounded-2xl p-5">
         <div className="flex items-center space-x-3.5">
@@ -149,21 +167,37 @@ export default function ActiveWorkoutScreen() {
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={handlePause}
+            className="flex items-center space-x-1.5 px-3 py-2 bg-[#20242D] hover:bg-[#282E3A] border border-[#303644] text-slate-300 text-xs font-medium rounded-xl transition cursor-pointer"
+            title="Pause and view other tabs (resume anytime from Today)"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+            <span>Pause</span>
+          </button>
+          <button
+            onClick={handleDiscard}
+            className="flex items-center space-x-1 px-3 py-2 bg-red-950/40 hover:bg-red-900/50 border border-red-800/40 text-red-300 text-xs font-medium rounded-xl transition cursor-pointer"
+            title="Cancel & discard this workout"
+          >
+            <X className="w-3.5 h-3.5" />
+            <span>Discard</span>
+          </button>
           <button
             onClick={undoLastSet}
             className="flex items-center space-x-1.5 px-3 py-2 bg-[#20242D] hover:bg-[#282E3A] border border-[#303644] text-slate-300 text-xs font-medium rounded-xl transition cursor-pointer"
             title="Cmd + Z"
           >
             <Undo2 className="w-3.5 h-3.5" />
-            <span>Undo Set <span className="font-mono text-[10px] text-slate-500">⌘Z</span></span>
+            <span>Undo <span className="font-mono text-[10px] text-slate-500">⌘Z</span></span>
           </button>
           <button
             onClick={handleFinish}
-            className="flex items-center space-x-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs rounded-xl transition shadow-lg shadow-emerald-500/20 cursor-pointer"
+            className="flex items-center space-x-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs rounded-xl transition shadow-lg shadow-emerald-500/20 cursor-pointer"
           >
             <Flag className="w-3.5 h-3.5 fill-black" />
-            <span>Finish Workout</span>
+            <span>Finish</span>
           </button>
         </div>
       </div>

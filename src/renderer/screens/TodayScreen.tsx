@@ -27,6 +27,7 @@ export default function TodayScreen() {
     selectedFocus,
     setSelectedFocus,
     startWorkout,
+    cancelCurrentWorkout,
     activeWorkout,
     isGenerating,
   } = useWorkoutStore();
@@ -76,7 +77,7 @@ export default function TodayScreen() {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto w-full pb-12">
+    <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 max-w-5xl mx-auto w-full pb-28">
       {/* Active Workout Resume Banner */}
       {activeWorkout && (
         <div className="bg-gradient-to-r from-emerald-950/80 to-[#14171E] border border-emerald-500/40 rounded-2xl p-5 flex items-center justify-between shadow-xl">
@@ -94,13 +95,25 @@ export default function TodayScreen() {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => setCurrentTab('workout')}
-            className="flex items-center space-x-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs rounded-xl transition shadow-lg shadow-emerald-500/20 cursor-pointer"
-          >
-            <span>Resume Workout</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={async () => {
+                if (window.confirm('Discard active workout session?')) {
+                  await cancelCurrentWorkout();
+                }
+              }}
+              className="px-3 py-2 bg-red-950/40 hover:bg-red-900/50 border border-red-800/40 text-red-300 font-semibold text-xs rounded-xl transition cursor-pointer"
+            >
+              Discard
+            </button>
+            <button
+              onClick={() => setCurrentTab('workout')}
+              className="flex items-center space-x-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs rounded-xl transition shadow-lg shadow-emerald-500/20 cursor-pointer"
+            >
+              <span>Resume Workout</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 

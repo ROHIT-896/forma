@@ -161,6 +161,7 @@ function setupIPCHandlers(dbInfo: { dbPath: string; backupCount: number; schemaV
   ipcMain.handle('workout:start', async (_e, params) => workoutRepo.startWorkout(getDatabase(), params));
   ipcMain.handle('workout:logSet', async (_e, set) => workoutRepo.logWorkoutSet(getDatabase(), set));
   ipcMain.handle('workout:undoSet', async (_e, workoutId) => workoutRepo.undoLastWorkoutSet(getDatabase(), workoutId));
+  ipcMain.handle('workout:cancel', async (_e, workoutId) => workoutRepo.cancelWorkout(getDatabase(), workoutId));
   ipcMain.handle('workout:getSets', async (_e, workoutId) => workoutRepo.getWorkoutSets(getDatabase(), workoutId));
   ipcMain.handle('workout:finish', async (_e, summary) => workoutRepo.finishWorkout(getDatabase(), summary));
   ipcMain.handle('workout:getActive', async () => workoutRepo.getActiveWorkout(getDatabase()));

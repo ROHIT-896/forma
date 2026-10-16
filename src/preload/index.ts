@@ -26,6 +26,7 @@ const api: FormaAPI = {
   startWorkout: (params) => ipcRenderer.invoke('workout:start', params),
   logWorkoutSet: (set) => ipcRenderer.invoke('workout:logSet', set),
   undoLastWorkoutSet: (workoutId) => ipcRenderer.invoke('workout:undoSet', workoutId),
+  cancelWorkout: (workoutId) => ipcRenderer.invoke('workout:cancel', workoutId),
   getWorkoutSets: (workoutId) => ipcRenderer.invoke('workout:getSets', workoutId),
   finishWorkout: (summary) => ipcRenderer.invoke('workout:finish', summary),
   getActiveWorkout: () => ipcRenderer.invoke('workout:getActive'),

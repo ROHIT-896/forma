@@ -123,6 +123,14 @@ export function undoLastWorkoutSet(
   return lastSet;
 }
 
+export function cancelWorkout(db: Database.Database, workoutId: string): void {
+  const cancelTx = db.transaction(() => {
+    db.prepare('DELETE FROM workout_sets WHERE workout_id = ?').run(workoutId);
+    db.prepare('DELETE FROM workouts WHERE id = ?').run(workoutId);
+  });
+  cancelTx();
+}
+
 export function getWorkoutSets(
   db: Database.Database,
   workoutId: string

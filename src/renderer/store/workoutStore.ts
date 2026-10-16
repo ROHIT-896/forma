@@ -53,6 +53,7 @@ interface WorkoutState {
   updateRestTick: () => Promise<void>;
   swapExercise: (oldExerciseId: string, newExercise: ExerciseDefinition) => void;
   finishCurrentWorkout: () => Promise<WorkoutSummary | null>;
+  cancelCurrentWorkout: () => Promise<void>;
   resetWorkoutState: () => void;
   checkForActiveSession: () => Promise<void>;
 }
@@ -359,6 +360,29 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     });
 
     return summary;
+  },
+
+  cancelCurrentWorkout: async () => {
+    const { activeWorkout } = get();
+    if (activeWorkout && window.formaAPI) {
+      try {
+        await window.formaAPI.cancelWorkout(activeWorkout.id);
+        await window.formaAPI.setPowerSaveBlocker(false);
+        await window.formaAPI.updateTrayTimer(null);
+      } catch (err) {
+        console.error('Failed to cancel workout:', err);
+      }
+    }
+    set({
+      activeWorkout: null,
+      generatedSession: null,
+      exerciseStates: [],
+      currentExerciseIndex: 0,
+      currentSetNumber: 1,
+      isResting: false,
+      restStartedAtMs: null,
+      completedSummary: null,
+    });
   },
 
   resetWorkoutState: () => {

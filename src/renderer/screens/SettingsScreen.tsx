@@ -4,6 +4,7 @@ import {
   Bell, Palette, RefreshCw, Trash2, CheckCircle2, Clock, AlertCircle,
 } from 'lucide-react';
 import type { AppInfo, DBPingResult } from '../../shared/types';
+import { useAppStore } from '../store/appStore';
 
 const ACCENT_COLORS = [
   { id: 'emerald', label: 'Emerald', bg: 'bg-emerald-500', hex: '#10b981' },
@@ -45,6 +46,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export default function SettingsScreen() {
+  const { setAccentColor: storeSetAccentColor } = useAppStore();
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [ping, setPing] = useState<DBPingResult | null>(null);
   const [backups, setBackups] = useState<Array<{ fileName: string; sizeBytes: number; createdAt: string }>>([]);
@@ -92,8 +94,7 @@ export default function SettingsScreen() {
 
   const handleAccentChange = async (colorId: string) => {
     setAccentColor(colorId);
-    if (!window.formaAPI) return;
-    await window.formaAPI.saveSettings({ accentColor: colorId });
+    await storeSetAccentColor(colorId); // applies CSS vars + persists
     setSaveStatus('Accent color updated');
     setTimeout(() => setSaveStatus(null), 2500);
   };

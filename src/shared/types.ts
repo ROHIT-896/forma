@@ -86,6 +86,7 @@ export interface FormaAPI {
     actual_rest_sec: number;
   }) => Promise<LoggedSet>;
   undoLastWorkoutSet: (workoutId: string) => Promise<LoggedSet | null>;
+  cancelWorkout: (workoutId: string) => Promise<void>;
   getWorkoutSets: (workoutId: string) => Promise<LoggedSet[]>;
   finishWorkout: (summary: WorkoutSummary) => Promise<void>;
   getActiveWorkout: () => Promise<{ workout: WorkoutRow; sets: LoggedSet[] } | null>;
